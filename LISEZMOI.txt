@@ -33,11 +33,19 @@ CONTENU
     « Texte lu sur la plaque » et touche le bon mot. Deux mots touchés à la suite s'ajoutent (ex. « G 5611 »).
   - Pièce : désignation puis référence Findis. Saisir la référence passe la pièce en « Pièce référencée ».
   - Compteurs en haut = filtres. Filtre « Pièce référencée » → bouton pour tout passer en « Commande envoyée ».
+  - Nouveau lot : tape son nom dans « Lot en cours » ; il apparaît dès la première photo.
+  - Archiver un lot terminé : sélectionne-le puis « Archiver ce lot » (ou le bouton proposé quand toutes les pièces sont reçues).
+    Il disparaît de « Tous les lots en cours » mais reste dans « Archives », d'où on peut le réactiver.
+  - Traçabilité : chaque action (photo, champ modifié, pièce ajoutée / retirée, référence, statut, archivage)
+    est enregistrée avec le prénom et l'heure. Bouton « Journal » en haut (lot affiché, filtre par personne)
+    et bouton « Historique » sur chaque fiche. L'export Excel contient un onglet « Journal ».
   - « Exporter Excel » : un onglet par lot, photo de la plaque en face des pièces, avec le statut.
     L'export suit le lot et le filtre affichés.
 
 À SAVOIR
   - Les modifications des autres apparaissent en direct.
+  - Les photos ne sont chargées que pour les fiches affichées (jamais pour les lots archivés) : la consommation Firebase reste faible.
   - La pastille « En ligne / Hors ligne » indique la connexion : hors ligne, les modifications ne sont pas enregistrées.
   - Le lecteur se trompe sur les plaques brillantes, floues ou très petites : cadrer serré et bien éclairé aide beaucoup.
+  - Le prénom est déclaré par chaque personne, sans mot de passe : le journal est fiable entre collègues de bonne foi.
   - Toute personne qui a l'adresse peut lire et modifier (même principe que tes autres outils sur envie-anjou-sav).

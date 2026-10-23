@@ -50,6 +50,8 @@ label.fld{display:grid;gap:3px;font-size:11px;font-weight:700;letter-spacing:.06
 .lotbar .fld{width:150px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
 .chip{font:600 13px var(--f-body);border-radius:999px;padding:5px 12px;min-height:32px;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.chip.arch{border-style:dashed}.chip.archived{border-style:dashed;opacity:.85}
+.chip.act{margin-left:auto;color:var(--ink);border-color:var(--muted)}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .stat{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 12px;text-align:left;display:grid;gap:2px;justify-content:stretch;font-weight:400}
@@ -88,6 +90,16 @@ details.ocr summary{cursor:pointer;color:var(--muted);font-weight:600}
 .steps button[aria-pressed="true"][data-s="envoyee"]{background:var(--s-env-bg);color:var(--s-env)}
 .steps button[aria-pressed="true"][data-s="recue"]{background:var(--s-rec-bg);color:var(--s-rec)}
 .pwho{grid-column:1/-1;font-size:11px;color:var(--muted);padding-left:2px}
+.footl{display:flex;gap:6px;flex-wrap:wrap}
+.jwrap{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:42;display:grid;justify-items:end}
+.jpanel{background:var(--surface);width:min(560px,100%);height:100%;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) 16px;box-shadow:-8px 0 24px rgba(0,0,0,.2)}
+.jhead{display:flex;justify-content:space-between;align-items:center}.jhead h2{font:700 22px var(--f-display);text-transform:uppercase;margin:0}
+.jtools{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.jtools .fld{min-width:200px}
+.jlist{overflow:auto;display:grid;align-content:start;gap:2px}
+.jday{font:700 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 0 4px;border-bottom:1px solid var(--line)}
+.jrow{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.jrow time{font:500 12px var(--f-mono);color:var(--muted);padding-top:2px}
+.jrow b{font-weight:600}.jrow .jl{color:var(--muted);font-size:12px}
 .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center}
 .empty h2{font:700 22px var(--f-display);text-transform:uppercase;color:var(--ink);margin:0}
@@ -127,6 +139,7 @@ details.ocr summary{cursor:pointer;color:var(--muted);font-weight:600}
         Photo de plaque
       </label>
       <input id="cam" type="file" accept="image/*" capture="environment" hidden>
+      <button id="journalBtn" type="button">Journal</button>
       <button id="exportBtn" type="button">Exporter Excel</button>
     </div>
   </header>
@@ -156,6 +169,13 @@ details.ocr summary{cursor:pointer;color:var(--muted);font-weight:600}
     <button type="button" id="skipBtn">Enregistrer sans lire</button>
     <button type="button" class="primary" id="readBtn">Lire la plaque</button>
     <button type="button" class="ghost" id="cancelBtn" style="color:#fff">Annuler</button>
+  </div>
+</div>
+<div class="jwrap" id="journal" hidden role="dialog" aria-modal="true" aria-labelledby="jTitle">
+  <div class="jpanel">
+    <div class="jhead"><h2 id="jTitle">Journal</h2><button type="button" class="ghost" id="jClose" aria-label="Fermer">✕</button></div>
+    <div class="jtools"><label class="fld" for="jWho">Personne<select id="jWho"><option value="">Tout le monde</option></select></label><span class="note" id="jCount"></span></div>
+    <div class="jlist" id="jList"></div>
   </div>
 </div>
 <div class="zoom" id="zoom" hidden><img id="zoomImg" alt="Plaque signalétique agrandie"></div>
@@ -308,24 +328,29 @@ const store=(()=>{
     const U=p=>DB_URL+"/"+ROOT+(p?"/"+p:"")+".json";
     const req=async(m,p,v)=>{const r=await fetch(U(p),{method:m,headers:{"Content-Type":"application/json"},body:v===undefined?undefined:JSON.stringify(v)});
       if(!r.ok)throw new Error(r.status===401||r.status===403?"refus":"http "+r.status);return r.json()};
-    let tree={},onOnline=()=>{},cb=()=>{};
-    const setAt=(path,val)=>{const ks=path.split("/").filter(Boolean);if(!ks.length){tree=val&&typeof val==="object"?val:{};return}
-      let o=tree;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=="object")o[ks[i]]={};o=o[ks[i]]}
-      if(val===null)delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=val};
-    const emit=()=>cb(JSON.parse(JSON.stringify(tree||{})));
-    function connect(){
-      let es;try{es=new EventSource(U("appareils"))}catch(e){onOnline(false);return}
-      es.addEventListener("put",e=>{const m=JSON.parse(e.data);setAt(m.path,m.data);emit()});
-      es.addEventListener("patch",e=>{const m=JSON.parse(e.data);for(const [k,v] of Object.entries(m.data||{}))setAt((m.path==="/"?"":m.path)+"/"+k,v);emit()});
-      es.addEventListener("cancel",()=>{onOnline(false);toast("Accès refusé à la base : ouvre le nœud findis dans les règles Firebase")});
-      es.addEventListener("auth_revoked",()=>{es.close();connect()});
-      es.onopen=()=>onOnline(true);
-      es.onerror=()=>{onOnline(false);if(es.readyState===2)setTimeout(connect,5000)};
+    let onOnline=()=>{};
+    // un flux temps réel par nœud écouté (appareils, lots)
+    function listen(path,cb){
+      let tree={};
+      const setAt=(p,val)=>{const ks=p.split("/").filter(Boolean);if(!ks.length){tree=val&&typeof val==="object"?val:{};return}
+        let o=tree;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=="object")o[ks[i]]={};o=o[ks[i]]}
+        if(val===null)delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=val};
+      const emit=()=>cb(JSON.parse(JSON.stringify(tree||{})));
+      function connect(){
+        let es;try{es=new EventSource(U(path))}catch(e){onOnline(false);return}
+        es.addEventListener("put",e=>{const m=JSON.parse(e.data);setAt(m.path,m.data);emit()});
+        es.addEventListener("patch",e=>{const m=JSON.parse(e.data);for(const [k,v] of Object.entries(m.data||{}))setAt((m.path==="/"?"":m.path)+"/"+k,v);emit()});
+        es.addEventListener("cancel",()=>{onOnline(false);toast("Accès refusé à la base : ouvre le nœud findis dans les règles Firebase")});
+        es.addEventListener("auth_revoked",()=>{es.close();connect()});
+        es.onopen=()=>onOnline(true);
+        es.onerror=()=>{onOnline(false);if(es.readyState===2)setTimeout(connect,5000)};
+      }
+      connect();
+      req("GET",path).then(v=>{tree=v||{};emit()}).catch(e=>{emit();toast(e.message==="refus"?"Accès refusé : ouvre le nœud findis dans les règles Firebase":"Base injoignable, vérifie la connexion")});
     }
     return {cloud,
       key:()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),
-      listen:f=>{cb=f;connect();req("GET","appareils").then(v=>{tree=v||{};emit()}).catch(e=>{emit();toast(e.message==="refus"?"Accès refusé : ouvre le nœud findis dans les règles Firebase":"Base injoignable, vérifie la connexion")})},
-      online:f=>{onOnline=f},
+      listen,online:f=>{onOnline=f},
       set:(p,v)=>req("PUT",p,v),
       update:(p,v)=>req("PATCH",p,v),
       remove:p=>req("DELETE",p),
@@ -334,16 +359,28 @@ const store=(()=>{
   }
   // mode local (si DB_URL est vide) : données dans ce navigateur uniquement
   const K="findisLocal";let data;try{data=JSON.parse(localStorage.getItem(K))||{}}catch(e){data={}}
-  let L=null;const save=()=>{try{localStorage.setItem(K,JSON.stringify(data))}catch(e){toast("Stockage local plein")}L&&L(JSON.parse(JSON.stringify(data.appareils||{})))};
+  const LS={};const save=()=>{try{localStorage.setItem(K,JSON.stringify(data))}catch(e){toast("Stockage local plein")}for(const [p,cb] of Object.entries(LS))cb(JSON.parse(JSON.stringify(data[p]||{})))};
   const at=(p,mk)=>{const ks=p.split("/");let o=data;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]){if(!mk)return [null];o[ks[i]]={}}o=o[ks[i]]}return [o,ks[ks.length-1]]};
   return {cloud,key:()=>"L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    listen:cb=>{L=cb;setTimeout(save,0)},online:cb=>cb(false),
+    listen:(p,cb)=>{LS[p]=cb;setTimeout(save,0)},online:cb=>cb(false),
     set:async(p,v)=>{const [o,k]=at(p,1);o[k]=v;save()},
     update:async(p,v)=>{const [o,k]=at(p,1);o[k]=Object.assign(o[k]||{},v);save()},
     remove:async p=>{const [o,k]=at(p);if(o)delete o[k];save()},
     get:async p=>{const [o,k]=at(p);return o?o[k]:null},
-    multi:async up=>{for(const [p,v] of Object.entries(up)){const [o,k]=at(p,1);o[k]=v}save()}};
+    multi:async up=>{for(const [p,v] of Object.entries(up)){if(v===null){const [o,k]=at(p);if(o)delete o[k]}else{const [o,k]=at(p,1);o[k]=v}}save()}};
 })();
+
+/* ================= VIGNETTES (chargées seulement pour les fiches affichées) ================= */
+const THUMBS={},thumbLoading={};
+function thumbOf(a){return a.thumb||THUMBS[a.id]||""}
+function loadThumbs(ids){
+  for(const id of ids){if(THUMBS[id]||thumbLoading[id])continue;thumbLoading[id]=true;
+    store.get("thumbs/"+id).then(v=>{if(v){THUMBS[id]=v;document.querySelectorAll(`img[data-thumb="${id}"]`).forEach(i=>i.src=v)}}).catch(()=>{}).finally(()=>delete thumbLoading[id])}
+}
+/* ================= LOTS ARCHIVÉS ================= */
+let LOTS={};
+const lotKey=l=>(l||"Sans lot").replace(/[.#$\[\]\/%]/g,"_").replace(/\s/g,"_");
+const estArchive=l=>!!(LOTS[lotKey(l)]&&LOTS[lotKey(l)].archive);
 
 /* ================= OCR LOCAL ================= */
 let ocrWorker=null;
@@ -406,9 +443,12 @@ async function enregistrer(lire){
     const src=rotated(C.img,C.rot,2400),k2=src.width/C.view.width;zone.width=r.w*k2;zone.height=r.h*k2;zone.getContext("2d").drawImage(src,r.x*k2,r.y*k2,r.w*k2,r.h*k2,0,0,zone.width,zone.height)}
   else if(lire){zone=rotated(C.img,C.rot,2400)}
   const id=store.key(),lot=($("lotNew").value.trim()||"Lot 1");ls.set("lotEnCours",lot);
-  const doc={lot,famille:"",marque:"",reference:"",codeService:"",serie:"",thumb:thumb.toDataURL("image/jpeg",.7),tw:full.width,th:full.height,
+  const doc={lot,famille:"",marque:"",reference:"",codeService:"",serie:"",tw:full.width,th:full.height,
     createdAt:Date.now(),createdBy:ME,analyse:lire?"en_cours":"manuel"};
-  try{await store.set("appareils/"+id,doc);await store.set("photos/"+id,full.toDataURL("image/jpeg",.78))}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
+  THUMBS[id]=thumb.toDataURL("image/jpeg",.7);
+  try{await store.set("thumbs/"+id,THUMBS[id]);await store.set("appareils/"+id,doc);await store.set("photos/"+id,full.toDataURL("image/jpeg",.78));
+    journal(lot,{id,...doc},"Photo de plaque ajoutée");
+    if(estArchive(lot))await store.update("lots/"+lotKey(lot),{archive:false})}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
   if(S.lot!=="__tous"&&S.lot!==lot)S.lot=lot;S.filtre=null;toast("Photo enregistrée");
   if(lire)lancerLecture(id,zone);
 }
@@ -418,42 +458,74 @@ async function lancerLecture(id,canvas){
     const up={analyse:"ok",ocrToks:toks,ocrConf:Math.round(conf)};
     for(const k of ["marque","reference","codeService","serie","famille"])if(a[k]&&!cur[k])up[k]=a[k];
     await store.update("appareils/"+id,up);
+    const lu=Object.keys(FL).filter(k=>up[k]).map(k=>`${FL[k]} ${q(up[k])}`);
+    journal(cur.lot,{...cur,...up,id},lu.length?`Lecture automatique : ${lu.join(", ")}`:"Lecture automatique : rien de reconnu");
     toast(a.reference||a.marque?"Plaque lue : vérifie les champs":"Lecture difficile : touche les mots lus pour remplir");
   }catch(e){console.error(e);await store.update("appareils/"+id,{analyse:"echec"}).catch(()=>{});toast("Le lecteur de plaque n'a pas pu démarrer")}
   delete S.reading[id];render();
 }
 
+/* ================= JOURNAL (qui a fait quoi) =================
+   Une entrée par action, rangée par lot : findis/journal/<lot>/<id>. Chargé uniquement à l'ouverture du journal. */
+const FL={famille:"Famille",marque:"Marque",reference:"Référence appareil",codeService:"Code service",serie:"N° de série",lot:"Lot"};
+const appLabel=a=>a?([a.famille,a.marque,a.reference].filter(Boolean).join(" ")||"Appareil sans nom"):"";
+const pLabel=p=>p&&p.nom?`« ${p.nom} »`:"(pièce sans nom)";
+const q=v=>v?`« ${v} »`:"(vide)";
+function journal(lot,app,txt){
+  const e={t:Date.now(),by:ME||"?",app:app?app.id:"",lbl:appLabel(app),lot:lot||"Sans lot",txt};
+  return store.set(`journal/${lotKey(lot)}/${store.key()}`,e).catch(()=>{});
+}
+
 /* ================= ÉCRITURE ================= */
 const appById=id=>S.apps.find(a=>a.id===id);
-async function patchApp(id,data){try{await store.update("appareils/"+id,data)}catch(e){toast("Enregistrement refusé : vérifie la connexion")}}
-async function patchPiece(id,pid,data){const a=appById(id);if(a){const p=a.pieces.find(x=>x.id===pid);if(p)Object.assign(p,data)}
+async function patchApp(id,data){const a=appById(id);const old=a?{...a}:{};
+  try{await store.update("appareils/"+id,data)}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
+  for(const [k,v] of Object.entries(data)){if(!(k in FL)||(old[k]||"")===(v||""))continue;
+    if(k==="lot"){journal(old.lot,old,`Déplacé vers ${v}`);journal(v,{...old,lot:v},`Arrivé depuis ${old.lot||"Sans lot"}`)}
+    else journal(old.lot,{...old,...data},`${FL[k]} : ${q(old[k])} → ${q(v)}`)}
+  if(a)Object.assign(a,data)}
+async function patchPiece(id,pid,data){const a=appById(id);let old={};if(a){const p=a.pieces.find(x=>x.id===pid);if(p){old={...p};Object.assign(p,data)}}
+  if(a){const n={...old,...data},msg=[];
+    if("nom" in data&&(old.nom||"")!==(data.nom||""))msg.push(`désignation ${q(old.nom)} → ${q(data.nom)}`);
+    if("ref" in data&&(old.ref||"")!==(data.ref||""))msg.push(`référence ${q(old.ref)} → ${q(data.ref)}`);
+    if("statut" in data&&(old.statut||"photo")!==data.statut)msg.push(`statut ${SLABEL[old.statut||"photo"]} → ${SLABEL[data.statut]}`);
+    if(msg.length)journal(a.lot,a,`Pièce ${pLabel(n)} : ${msg.join(", ")}`)}
   try{await store.update(`appareils/${id}/pieces/${pid}`,{...data,maj:Date.now(),majBy:ME})}catch(e){toast("Enregistrement refusé : vérifie la connexion")}}
 const normPieces=raw=>Object.entries(raw||{}).map(([id,v])=>({...v,id})).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
 
 /* ================= RENDU ================= */
-const lots=()=>[...new Set(S.apps.map(a=>a.lot||"Sans lot"))].sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}));
-const inLot=a=>S.lot==="__tous"||(a.lot||"Sans lot")===S.lot;
+const tousLots=()=>[...new Set(S.apps.map(a=>a.lot||"Sans lot"))].sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}));
+const lots=()=>tousLots().filter(l=>!estArchive(l));
+const lotsArch=()=>tousLots().filter(estArchive);
+const inLot=a=>S.lot==="__tous"?!estArchive(a.lot):(a.lot||"Sans lot")===S.lot;
 let renderT=null;
 function render(){clearTimeout(renderT);renderT=setTimeout(doRender,0)} // différé : le focus a le temps d'atteindre le champ suivant
 function doRender(){
   if(!S.ready)return;
   const ae=document.activeElement;if(ae&&ae.closest&&ae.closest("#list")&&ae.matches("input,select")){S.dirty=true;return}
   S.dirty=false;
-  const L=lots();$("lotsList").innerHTML=L.map(l=>`<option value="${esc(l)}">`).join("");
-  if(S.lot!=="__tous"&&!L.includes(S.lot))S.lot="__tous";
-  $("lotChips").innerHTML=[["__tous","Tous les lots"],...L.map(l=>[l,l])].map(([k,l])=>`<button type="button" class="chip" data-lot="${esc(k)}" aria-pressed="${S.lot===k}">${esc(l)}</button>`).join("");
+  const L=lots(),A=lotsArch();$("lotsList").innerHTML=L.map(l=>`<option value="${esc(l)}">`).join("");
+  if(S.lot!=="__tous"&&!L.includes(S.lot)&&!A.includes(S.lot))S.lot="__tous";
+  const chip=(k,l,cls="")=>`<button type="button" class="chip ${cls}" data-lot="${esc(k)}" aria-pressed="${S.lot===k}">${esc(l)}</button>`;
+  const selArch=S.lot!=="__tous"&&estArchive(S.lot);
+  $("lotChips").innerHTML=chip("__tous","Tous les lots en cours")+L.map(l=>chip(l,l)).join("")
+    +(A.length?`<button type="button" class="chip arch" id="archToggle" aria-expanded="${!!(S.showArch||selArch)}">Archives (${A.length}) ${S.showArch||selArch?"▴":"▾"}</button>`+(S.showArch||selArch?A.map(l=>chip(l,"🗄 "+l,"archived")).join(""):""):"")
+    +(S.lot!=="__tous"?`<button type="button" class="chip act" id="archBtn">${selArch?"Réactiver ce lot":(S.archArm?"Confirmer l'archivage":"Archiver ce lot")}</button>`:"");
   const apps=S.apps.filter(inLot);const cnt={photo:0,reference:0,envoyee:0,recue:0};
   apps.forEach(a=>a.pieces.forEach(p=>cnt[p.statut||"photo"]++));const tot=cnt.photo+cnt.reference+cnt.envoyee+cnt.recue;
   $("stats").innerHTML=STATUTS.map(s=>`<button type="button" class="stat" data-s="${s.k}" aria-pressed="${S.filtre===s.k}"><span>${s.l}</span><b>${cnt[s.k]}</b><small>${tot?Math.round(cnt[s.k]*100/tot):0} % des pièces</small></button>`).join("");
   const b=$("bulk");
   if(S.filtre==="reference"&&cnt.reference){b.hidden=false;b.innerHTML=`<button type="button" id="bulkSend" class="primary">Passer les ${cnt.reference} pièces en « Commande envoyée »</button><span>une fois la commande envoyée à Findis</span>`}
   else if(S.filtre==="envoyee"&&cnt.envoyee){b.hidden=false;b.innerHTML=`<button type="button" id="bulkRecv">Passer les ${cnt.envoyee} pièces en « Commande reçue »</button>`}
+  else if(S.lot!=="__tous"&&!estArchive(S.lot)&&tot>0&&cnt.recue===tot){b.hidden=false;b.innerHTML=`<span>Toutes les pièces de ce lot sont reçues.</span><button type="button" id="bulkArch">Archiver ${esc(S.lot)}</button>`}
+  else if(selArch){b.hidden=false;b.innerHTML=`<span>🗄 Lot archivé : il n'apparaît plus dans « Tous les lots en cours ».</span>`}
   else{b.hidden=true;b.innerHTML=""}
   const list=$("list");let shown=S.filtre?apps.filter(a=>a.pieces.some(p=>(p.statut||"photo")===S.filtre)):apps;
   if(!S.apps.length){list.innerHTML=`<div class="empty"><h2>Aucun appareil</h2><div>Prends en photo la plaque signalétique d'un appareil. Marque, référence et famille sont proposées, tu valides puis tu notes les pièces à commander.<br>Sur PC, tu peux aussi glisser ou coller une photo dans la page.</div><label class="btn primary big" for="cam">Photo de plaque</label><button type="button" id="impBtn" hidden>Importer les lots 2 et 3 existants</button></div>`;
     fetch("import-lots-2-3.json",{method:"HEAD"}).then(r=>{const b=$("impBtn");if(r.ok&&b)b.hidden=false}).catch(()=>{});return}
   if(!shown.length){list.innerHTML=`<div class="empty">Aucun appareil dans cette vue.</div>`;return}
   list.innerHTML=shown.map(card).join("");
+  loadThumbs(shown.filter(a=>!thumbOf(a)).map(a=>a.id));
   if(S.pendingFocus){const el=list.querySelector(`[data-pf="${S.pendingFocus}"]`);S.pendingFocus=null;if(el)el.focus()}
 }
 function card(a){
@@ -464,7 +536,7 @@ function card(a){
   const fld=(f,label,mono)=>`<label class="fld">${label}<input class="${mono?"mono ":""}${tgt===f?"target":""}" data-f="${f}" data-id="${a.id}" value="${esc(a[f])}"></label>`;
   return `<article class="card">
   <div class="ph">
-    <button type="button" data-act="zoom" data-id="${a.id}" aria-label="Agrandir la photo">${a.thumb?`<img src="${a.thumb}" alt="Plaque ${esc(a.marque)} ${esc(a.reference)}">`:""}</button>
+    <button type="button" data-act="zoom" data-id="${a.id}" aria-label="Agrandir la photo"><img data-thumb="${a.id}" src="${thumbOf(a)||"data:image/gif;base64,R0lGODlhAQABAAAAACw="}" style="min-height:${thumbOf(a)?0:90}px" alt="Plaque ${esc(a.marque)} ${esc(a.reference)}"></button>
     <div class="meta">${a.serie?"N° série "+esc(a.serie)+"<br>":""}Photo : ${esc(a.createdBy||"?")} · ${new Date(a.createdAt).toLocaleDateString("fr-FR")}${a.ocrConf!=null?`<br>Lisibilité ${a.ocrConf} %`:""}</div>
   </div>
   <div class="body">${reading}
@@ -477,7 +549,7 @@ function card(a){
     <div class="pieces"><div class="ptitle">Pièces à commander · ${a.pieces.length}</div>
       ${pcs.map(p=>piece(a,p)).join("")||(S.filtre?"":`<div class="note">Aucune pièce notée pour l'instant.</div>`)}
     </div>
-    <div class="foot"><button type="button" data-act="addp" data-id="${a.id}">+ Ajouter une pièce</button>
+    <div class="foot"><span class="footl"><button type="button" data-act="addp" data-id="${a.id}">+ Ajouter une pièce</button><button type="button" class="ghost" data-act="hist" data-id="${a.id}">Historique</button></span>
       <button type="button" class="ghost danger" data-act="del" data-id="${a.id}">${armed?"Confirmer la suppression":"Supprimer l'appareil"}</button></div>
   </div></article>`}
 function piece(a,p){const s=p.statut||"photo",armed=S.delArm===p.id;
@@ -493,11 +565,23 @@ function piece(a,p){const s=p.statut||"photo",armed=S.delArm===p.id;
 document.addEventListener("focusout",()=>setTimeout(()=>{if(S.dirty)render()},0));
 $("lotNew").value=ls.get("lotEnCours")||"Lot 1";
 $("lotNew").addEventListener("change",e=>ls.set("lotEnCours",e.target.value.trim()||"Lot 1"));
-$("lotChips").addEventListener("click",e=>{const b=e.target.closest("[data-lot]");if(!b)return;S.lot=b.dataset.lot;if(S.lot!=="__tous"){$("lotNew").value=S.lot;ls.set("lotEnCours",S.lot)}render()});
+$("lotChips").addEventListener("click",async e=>{
+  if(e.target.id==="archToggle"){S.showArch=!S.showArch;if(!S.showArch&&estArchive(S.lot))S.lot="__tous";render();return}
+  if(e.target.id==="archBtn"){await basculerArchive(S.lot);return}
+  const b=e.target.closest("[data-lot]");if(!b)return;S.archArm=false;S.lot=b.dataset.lot;if(S.lot!=="__tous"&&!estArchive(S.lot)){$("lotNew").value=S.lot;ls.set("lotEnCours",S.lot)}render()});
 $("stats").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;S.filtre=S.filtre===b.dataset.s?null:b.dataset.s;render()});
-$("bulk").addEventListener("click",async e=>{const to=e.target.id==="bulkSend"?"envoyee":e.target.id==="bulkRecv"?"recue":null;if(!to)return;
+async function basculerArchive(lot){
+  if(estArchive(lot)){try{await store.update("lots/"+lotKey(lot),{archive:false,at:Date.now(),by:ME});journal(lot,null,"Lot réactivé");toast(lot+" réactivé")}catch(e){toast("Enregistrement refusé : vérifie la connexion")}return}
+  if(!S.archArm){S.archArm=true;render();clearTimeout(S.archT);S.archT=setTimeout(()=>{S.archArm=false;render()},3500);return}
+  S.archArm=false;
+  try{await store.set("lots/"+lotKey(lot),{nom:lot,archive:true,at:Date.now(),by:ME});journal(lot,null,"Lot archivé");S.lot="__tous";S.filtre=null;S.showArch=false;render();toast(lot+" archivé : retrouvable dans « Archives »")}
+  catch(e){toast("Enregistrement refusé : vérifie la connexion")}
+}
+$("bulk").addEventListener("click",async e=>{if(e.target.id==="bulkArch"){S.archArm=true;await basculerArchive(S.lot);return}const to=e.target.id==="bulkSend"?"envoyee":e.target.id==="bulkRecv"?"recue":null;if(!to)return;
   const from=to==="envoyee"?"reference":"envoyee";e.target.disabled=true;const up={};
-  S.apps.filter(inLot).forEach(a=>a.pieces.forEach(p=>{if(p.statut===from){up[`appareils/${a.id}/pieces/${p.id}/statut`]=to;up[`appareils/${a.id}/pieces/${p.id}/maj`]=Date.now();up[`appareils/${a.id}/pieces/${p.id}/majBy`]=ME}}));
+  const touches=[];
+  S.apps.filter(inLot).forEach(a=>{const ps=a.pieces.filter(p=>p.statut===from);if(ps.length)touches.push([a,ps]);ps.forEach(p=>{up[`appareils/${a.id}/pieces/${p.id}/statut`]=to;up[`appareils/${a.id}/pieces/${p.id}/maj`]=Date.now();up[`appareils/${a.id}/pieces/${p.id}/majBy`]=ME})});
+  touches.forEach(([a,ps])=>journal(a.lot,a,`${ps.map(pLabel).join(", ")} : ${SLABEL[from]} → ${SLABEL[to]} (passage groupé)`));
   try{await store.multi(up)}catch(err){toast("Enregistrement refusé : vérifie la connexion")}
   S.filtre=to;render();toast("Statuts mis à jour")});
 $("list").addEventListener("focusin",e=>{const t=e.target;if(t.dataset&&t.dataset.f&&t.tagName==="INPUT"&&t.dataset.f!=="lot"){S.target[t.dataset.id]=t.dataset.f;document.querySelectorAll(`input[data-id="${t.dataset.id}"][data-f]`).forEach(i=>i.classList.toggle("target",i===t))}});
@@ -508,25 +592,59 @@ $("list").addEventListener("change",e=>{const t=e.target,id=t.dataset.id;if(!id)
 $("list").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("input")){e.preventDefault();e.target.blur()}});
 $("list").addEventListener("mousedown",e=>{if(e.target.closest(".tok"))e.preventDefault()});
 $("list").addEventListener("click",async e=>{const b=e.target.closest("[data-act]");if(!b)return;const id=b.dataset.id,act=b.dataset.act;
-  if(act==="zoom"){const a=appById(id);$("zoomImg").src=a.thumb;$("zoom").hidden=false;store.get("photos/"+id).then(u=>{if(u)$("zoomImg").src=u}).catch(()=>{});return}
+  if(act==="zoom"){const a=appById(id);$("zoomImg").src=thumbOf(a);$("zoom").hidden=false;store.get("photos/"+id).then(u=>{if(u)$("zoomImg").src=u}).catch(()=>{});return}
   if(act==="tok"){const f=S.target[id]||"reference";const inp=document.querySelector(`input[data-id="${id}"][data-f="${f}"]`);const t=b.dataset.t;
     const L=S.lastTok;const v=L&&L.id===id&&L.f===f&&Date.now()-L.t<5000&&inp?inp.value+" "+t:t;S.lastTok={id,f,t:Date.now()};if(inp)inp.value=v;await patchApp(id,{[f]:v});toast(`${t} → ${f==="codeService"?"code service":f==="serie"?"n° de série":f}`);return}
-  if(act==="addp"){const pid=store.key();S.pendingFocus=pid;const a=appById(id);a.pieces.push({id:pid,nom:"",ref:"",statut:"photo"});
+  if(act==="addp"){const pid=store.key();S.pendingFocus=pid;const a=appById(id);a.pieces.push({id:pid,nom:"",ref:"",statut:"photo"});journal(a.lot,a,"Pièce ajoutée");
     await store.update(`appareils/${id}/pieces/${pid}`,{nom:"",ref:"",statut:"photo",ordre:Date.now(),maj:Date.now(),majBy:ME});render();return}
   if(act==="st"){patchPiece(id,b.dataset.p,{statut:b.dataset.s});render();return}
   if(act==="delp"||act==="del"){const key=act==="del"?id:b.dataset.p;
     if(S.delArm!==key){S.delArm=key;render();clearTimeout(S.delT);S.delT=setTimeout(()=>{S.delArm=null;render()},3500);return}
-    S.delArm=null;try{if(act==="del"){await store.remove("appareils/"+id);await store.remove("photos/"+id);toast("Appareil supprimé")}
-      else{await store.remove(`appareils/${id}/pieces/${key}`)}}catch(err){toast("Suppression refusée")}render();return}});
+    S.delArm=null;const a=appById(id);
+    try{if(act==="del"){await store.remove("appareils/"+id);await store.remove("photos/"+id);await store.remove("thumbs/"+id);
+        journal(a.lot,a,`Appareil supprimé (${a.pieces.length} pièce${a.pieces.length>1?"s":""} : ${a.pieces.map(p=>(p.nom||"?")+(p.ref?" "+p.ref:"")).join(" ; ")||"aucune"})`);toast("Appareil supprimé")}
+      else{const p=a.pieces.find(x=>x.id===key);await store.remove(`appareils/${id}/pieces/${key}`);journal(a.lot,a,`Pièce ${pLabel(p)}${p&&p.ref?" (réf. "+p.ref+")":""} retirée`)}}
+    catch(err){toast("Suppression refusée")}render();return}
+  if(act==="hist"){openJournal(id);return}});
 $("zoom").addEventListener("click",()=>$("zoom").hidden=true);
 $("list").addEventListener("click",async e=>{if(e.target.id!=="impBtn")return;e.target.disabled=true;e.target.textContent="Import en cours…";
   try{const j=await (await fetch("import-lots-2-3.json")).json();const up={};
-    for(const [k,v] of Object.entries(j.appareils||{}))up["appareils/"+k]=v;for(const [k,v] of Object.entries(j.photos||{}))up["photos/"+k]=v;
-    await store.multi(up);toast("Lots 2 et 3 importés")}catch(err){toast("Import impossible");e.target.disabled=false}});
+    for(const [k,v] of Object.entries(j.appareils||{})){const {thumb,...rest}=v;up["appareils/"+k]=rest;if(thumb)up["thumbs/"+k]=thumb}for(const [k,v] of Object.entries(j.photos||{}))up["photos/"+k]=v;
+    await store.multi(up);for(const l of new Set(Object.values(j.appareils||{}).map(v=>v.lot)))journal(l,null,"Lot importé depuis l'ancien fichier Excel");toast("Lots 2 et 3 importés")}catch(err){toast("Import impossible");e.target.disabled=false}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("zoom").hidden=true;$("cropModal").hidden=true}});
 function askName(){$("nameForm").hidden=false;$("nameIn").value=ME;$("nameIn").focus()}
 $("mePill").onclick=askName;
 $("nameForm").addEventListener("submit",e=>{e.preventDefault();ME=$("nameIn").value.trim();if(!ME)return;ls.set("findisNom",ME);$("nameForm").hidden=true;$("mePill").textContent="👤 "+ME});
+
+/* ================= AFFICHAGE DU JOURNAL ================= */
+const J={entries:[],appId:null};
+async function lireJournal(lotsCibles){const res=await Promise.all(lotsCibles.map(l=>store.get("journal/"+lotKey(l)).then(v=>v||{})));
+  return res.flatMap(o=>Object.values(o)).sort((x,y)=>y.t-x.t)}
+async function openJournal(appId){
+  const a=appId?appById(appId):null;J.appId=appId||null;
+  const cibles=a?[a.lot||"Sans lot"]:(S.lot==="__tous"?lots():[S.lot]);
+  $("jTitle").textContent=a?"Historique":"Journal";
+  $("jCount").textContent=a?appLabel(a):(S.lot==="__tous"?"Tous les lots en cours":S.lot);
+  $("journal").hidden=false;$("jList").innerHTML='<div class="note">Chargement…</div>';$("jClose").focus();
+  try{J.entries=(await lireJournal(cibles)).filter(e=>!appId||e.app===appId)}
+  catch(e){J.entries=[];$("jList").innerHTML='<div class="note">Journal inaccessible : vérifie la connexion.</div>';return}
+  const who=[...new Set(J.entries.map(e=>e.by))].sort((x,y)=>x.localeCompare(y,"fr"));
+  $("jWho").innerHTML='<option value="">Tout le monde</option>'+who.map(w=>`<option>${esc(w)}</option>`).join("");
+  renderJ();
+}
+function renderJ(){const w=$("jWho").value,es=J.entries.filter(e=>!w||e.by===w);
+  if(!es.length){$("jList").innerHTML='<div class="note">Aucune action enregistrée pour l\'instant.</div>';return}
+  let day="",h="";
+  for(const e of es){const d=new Date(e.t),dl=d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    if(dl!==day){day=dl;h+=`<div class="jday">${dl}</div>`}
+    const sous=J.appId?"":(e.lbl?`${esc(e.lbl)} · ${esc(e.lot)}`:esc(e.lot));
+    h+=`<div class="jrow"><time>${d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</time><div><b>${esc(e.by)}</b> · ${esc(e.txt)}${sous?`<div class="jl">${sous}</div>`:""}</div></div>`}
+  $("jList").innerHTML=h}
+$("journalBtn").addEventListener("click",()=>openJournal(null));
+$("jClose").addEventListener("click",()=>$("journal").hidden=true);
+$("journal").addEventListener("click",e=>{if(e.target.id==="journal")$("journal").hidden=true});
+$("jWho").addEventListener("change",renderJ);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("journal").hidden=true});
 
 /* ================= EXPORT EXCEL ================= */
 $("exportBtn").addEventListener("click",async()=>{
@@ -559,13 +677,20 @@ $("exportBtn").addEventListener("click",async()=>{
             c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});row.getCell(5).numFmt="@"});
         if(n>1)["A","B","C"].forEach(cl=>ws.mergeCells(`${cl}${r}:${cl}${r+n-1}`));
         ws.getCell(`A${r}`).font={name:"Arial",size:11,bold:true};ws.getCell(`B${r}`).font={name:"Arial",size:9,color:{argb:"FF555555"}};
-        let photo=null;try{photo=await store.get("photos/"+a.id)}catch(e){}photo=photo||a.thumb;
+        let photo=null;try{photo=await store.get("photos/"+a.id)}catch(e){}if(!photo){try{photo=thumbOf(a)||await store.get("thumbs/"+a.id)}catch(e){}}
         if(photo){const im=wb.addImage({base64:photo,extension:"jpeg"});const totPx=rowPt*n/.75,offY=Math.max(6,(totPx-h)/2),rowPx=rowPt/.75;
           ws.addImage(im,{tl:{col:2+((34*7+5-w)/2)/(34*7+5),row:(r-1)+Math.min(n-.01,offY/rowPx)},ext:{width:w,height:h},editAs:"oneCell"})}
         r+=n}
       ws.getCell(`A${r+1}`).value="Références appareil lues sur les photos des plaques : à vérifier avant commande.";
       ws.getCell(`A${r+1}`).font={name:"Arial",size:9,italic:true,color:{argb:"FF777777"}};
     }
+    // onglet Journal : qui a fait quoi sur les lots exportés
+    try{const es=(await lireJournal(Object.keys(byLot))).slice().reverse();
+      const wj=wb.addWorksheet("Journal",{views:[{state:"frozen",ySplit:1}]});
+      wj.columns=[{header:"Date",key:"d",width:12},{header:"Heure",key:"h",width:8},{header:"Qui",key:"by",width:16},{header:"Lot",key:"lot",width:12},{header:"Appareil",key:"lbl",width:34},{header:"Action",key:"txt",width:70}];
+      wj.getRow(1).font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};wj.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF455A64"}};
+      es.forEach(e=>{const d=new Date(e.t);const r=wj.addRow({d:d.toLocaleDateString("fr-FR"),h:d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),by:e.by,lot:e.lot,lbl:e.lbl,txt:e.txt});r.font={name:"Arial",size:10};r.alignment={vertical:"top",wrapText:true}});
+    }catch(e){}
     const buf=await wb.xlsx.writeBuffer();
     const name=`commande_pieces_findis_${S.lot==="__tous"?"tous_lots":S.lot.replace(/\s+/g,"_")}_${new Date().toISOString().slice(0,10)}.xlsx`;
     const url=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
@@ -579,7 +704,12 @@ if(!store.cloud){$("setup").hidden=false;$("setup").innerHTML="<b>Mode local :</
 $("ocrNote").textContent=ocrDispo()?"Lecteur de plaque installé : la lecture se fait sur cet appareil, rien n'est envoyé ailleurs.":"Lecteur de plaque non installé (dossier ocr/ absent) : la saisie se fait à la main.";
 $("mePill").textContent=ME?"👤 "+ME:"👤 Qui es-tu ?";if(!ME)askName();
 store.online(on=>{const p=$("netPill");p.textContent=store.cloud?(on?"● En ligne":"● Hors ligne"):"● Données locales";p.className="pill "+(on?"on":"off")});
-store.listen(val=>{S.apps=Object.entries(val).map(([id,d])=>({...d,id,pieces:normPieces(d.pieces)})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));S.ready=true;render()});
+const migres=new Set();
+store.listen("appareils",val=>{S.apps=Object.entries(val).map(([id,d])=>({...d,id,pieces:normPieces(d.pieces)})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));S.ready=true;render();
+  // anciennes fiches avec vignette intégrée : on la déplace dans "thumbs" pour alléger le chargement
+  const up={};S.apps.forEach(a=>{if(a.thumb&&!migres.has(a.id)){migres.add(a.id);up["thumbs/"+a.id]=a.thumb;up["appareils/"+a.id+"/thumb"]=null}});
+  if(Object.keys(up).length)store.multi(up).catch(()=>{})});
+store.listen("lots",v=>{LOTS=v||{};render()});
 </script>
 </body>
 </html>
