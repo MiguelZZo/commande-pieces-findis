@@ -27,7 +27,13 @@ CONTENU
 
 4. UTILISATION
   - Chaque personne indique son prénom à la première ouverture (affiché sur ses modifications).
-  - « Photo de plaque » : téléphone = appareil photo ; PC = choisir un fichier, ou glisser / coller une image.
+  - « Photo de plaque » ouvre l'appareil photo ; « Importer une photo » prend une image déjà enregistrée
+    (galerie du téléphone ou fichier sur PC). Sur PC, on peut aussi glisser ou coller une image.
+  - Enregistrement : chaque champ s'enregistre dès que tu le quittes ou appuies sur Entrée.
+    Un champ en cours de saisie est surligné en orange et un bouton « ✓ Enregistrer » apparaît sur la fiche ;
+    une fois enregistré, le champ s'entoure de vert et un message « ✓ Enregistré » s'affiche.
+  - Code-barres : champ sur chaque fiche, avec le bouton scanner pour le lire à l'appareil photo,
+    ou saisie à la main. Si la photo de plaque contient un code-barres lisible, il est rempli automatiquement.
   - Encadre la plaque avec le doigt, ↻ pour la remettre droite, puis « Lire la plaque ».
   - Vérifie les champs proposés. Pour corriger : touche le champ (il s'encadre en vert), ouvre
     « Texte lu sur la plaque » et touche le bon mot. Deux mots touchés à la suite s'ajoutent (ex. « G 5611 »).
