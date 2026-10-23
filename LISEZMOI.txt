@@ -1,44 +1,43 @@
 COMMANDE PIÈCES FINDIS — ENVIE ANJOU
 Outil autonome : photo de plaque signalétique → marque / référence / famille → pièces à commander → suivi du statut.
 Aucun service d'IA : la lecture des plaques se fait dans le navigateur (moteur OCR Tesseract, dossier ocr/).
+Données : Firebase envie-anjou-sav, nœud « findis » (même accès que l'outil Maintenance ALM, rien à configurer dans le fichier).
 
 CONTENU
-  index.html               l'outil (Firebase et l'export Excel sont inclus dans le fichier)
+  index.html               l'outil (export Excel inclus dans le fichier)
   ocr/                     le lecteur de plaque (environ 11 Mo, téléchargé une fois puis gardé en cache)
-  import-lots-2-3.json     tes lots 2 et 3 actuels, à importer une fois dans Firebase (facultatif)
+  import-lots-2-3.json     tes lots 2 et 3 actuels (un bouton d'import apparaît dans l'outil tant qu'il est vide)
 
-1. CONFIGURER FIREBASE (projet envie-anjou-sav)
-  a. Ouvre index.html dans un éditeur de texte, cherche « FIREBASE_CONFIG ».
-  b. Colle les valeurs de ton projet envie-anjou-sav (les mêmes que dans l'outil Maintenance ALM) :
-     apiKey, databaseURL, messagingSenderId, appId.
-  c. Console Firebase > Realtime Database > Règles : ajoute le nœud « findis » à côté de « alm » :
-       "findis": { ".read": true, ".write": true }
-     puis Publier.
-  Sans configuration, l'outil marche en « mode local » (données sur un seul appareil).
+1. OUVRIR LE NŒUD « findis » DANS FIREBASE (obligatoire, 1 minute)
+  Console Firebase > projet envie-anjou-sav > Realtime Database > onglet Règles.
+  Ajoute la ligne findis à côté de alm, par exemple :
+      "alm":    { ".read": true, ".write": true },
+      "findis": { ".read": true, ".write": true }
+  puis Publier.
 
 2. METTRE EN LIGNE (GitHub Pages)
-  a. Crée un dépôt, par exemple « commande-pieces-findis ».
-  b. Envoie TOUT le contenu du dossier (index.html + dossier ocr/ avec ses fichiers) via « Add file > Upload files ».
-  c. Settings > Pages > Branch : main / root > Save.
-  d. L'adresse sera https://<ton-compte>.github.io/commande-pieces-findis/
+  a. Crée un dépôt public, par exemple « commande-pieces-findis ».
+  b. « Add file > Upload files » : glisse index.html, import-lots-2-3.json ET le dossier ocr/ (avec son sous-dossier lang/).
+  c. Settings > Pages > Branch : main / (root) > Save.
+  d. Adresse : https://<ton-compte>.github.io/commande-pieces-findis/
 
-3. IMPORTER LES LOTS 2 ET 3 (facultatif, une seule fois)
-  Console Firebase > Realtime Database > clique sur le nœud « findis » (crée-le s'il n'existe pas)
-  > menu ⋮ > Importer JSON > choisis import-lots-2-3.json.
-  Attention : l'import remplace tout le contenu de « findis ». À faire avant la première utilisation.
+3. PREMIÈRE OUVERTURE
+  - Indique ton prénom.
+  - L'outil est vide : clique « Importer les lots 2 et 3 existants » si tu veux les retrouver (une seule fois).
 
 4. UTILISATION
   - Chaque personne indique son prénom à la première ouverture (affiché sur ses modifications).
   - « Photo de plaque » : téléphone = appareil photo ; PC = choisir un fichier, ou glisser / coller une image.
   - Encadre la plaque avec le doigt, ↻ pour la remettre droite, puis « Lire la plaque ».
-  - Les champs proposés sont à vérifier. Si un champ est faux : touche le champ (il s'encadre en vert),
-    ouvre « Texte lu sur la plaque » et touche le bon mot. Deux mots touchés à la suite s'ajoutent (ex. « G 5611 »).
+  - Vérifie les champs proposés. Pour corriger : touche le champ (il s'encadre en vert), ouvre
+    « Texte lu sur la plaque » et touche le bon mot. Deux mots touchés à la suite s'ajoutent (ex. « G 5611 »).
   - Pièce : désignation puis référence Findis. Saisir la référence passe la pièce en « Pièce référencée ».
   - Compteurs en haut = filtres. Filtre « Pièce référencée » → bouton pour tout passer en « Commande envoyée ».
   - « Exporter Excel » : un onglet par lot, photo de la plaque en face des pièces, avec le statut.
     L'export suit le lot et le filtre affichés.
 
 À SAVOIR
+  - Les modifications des autres apparaissent en direct.
+  - La pastille « En ligne / Hors ligne » indique la connexion : hors ligne, les modifications ne sont pas enregistrées.
   - Le lecteur se trompe sur les plaques brillantes, floues ou très petites : cadrer serré et bien éclairé aide beaucoup.
-  - Les données sont accessibles à toute personne qui a l'adresse (même principe que tes autres outils sur envie-anjou-sav).
-  - Hors réseau, les modifications sont gardées et envoyées au retour de la connexion tant que la page reste ouverte.
+  - Toute personne qui a l'adresse peut lire et modifier (même principe que tes autres outils sur envie-anjou-sav).
