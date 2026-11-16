@@ -91,6 +91,29 @@ details.ocr summary{cursor:pointer;color:var(--muted);font-weight:600}
 .steps button[aria-pressed="true"][data-s="recue"]{background:var(--s-rec-bg);color:var(--s-rec)}
 .pwho{grid-column:1/-1;font-size:11px;color:var(--muted);padding-left:2px}
 .footl{display:flex;gap:6px;flex-wrap:wrap}
+.combo{position:relative;display:grid;gap:3px}
+.lotbar .combo{width:240px}
+.combo>label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pop{position:absolute;top:100%;left:0;right:0;margin-top:4px;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:320px;overflow:auto;padding:4px;min-width:260px}
+.opt{display:grid;justify-items:start;justify-content:stretch;gap:1px;width:100%;border:0;border-radius:6px;background:transparent;min-height:0;padding:8px 10px;text-align:left;font-weight:600}
+.opt small{font-weight:400;color:var(--muted);font-size:12px}
+.opt:hover,.opt:focus{background:var(--sunk);outline:none}
+.opt.cur{box-shadow:inset 3px 0 0 var(--accent)}
+.opt.create{color:var(--accent)}
+.popnote{padding:8px 10px}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.filters .fld{width:170px}.filters .fld.grow{flex:1;min-width:220px;width:auto}
+.fend{display:flex;gap:8px;align-items:center;margin-left:auto}
+#fCount{font-variant-numeric:tabular-nums;white-space:nowrap}
+.send{border-color:var(--s-env);color:var(--s-env)}
+.send.armed{background:var(--s-env);color:#fff}
+.card.fresh{box-shadow:0 0 0 3px var(--accent)}
+.sheetwrap{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:44;display:grid;place-items:center;padding:16px}
+.sheet{background:var(--surface);color:var(--ink);border-radius:12px;width:min(460px,100%);padding:18px;display:grid;gap:14px;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.sheet h2{font:700 22px var(--f-display);text-transform:uppercase;margin:0}
+.npstep{display:grid;gap:2px;border-left:4px solid var(--accent);padding:4px 0 4px 10px}
+.npstep span{font-size:13px;color:var(--muted)}
+.npbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 input.dirty{border-color:var(--s-ref);background:var(--s-ref-bg)}
 input.ok{border-color:var(--s-rec);box-shadow:0 0 0 2px color-mix(in srgb,var(--s-rec) 35%,transparent);transition:box-shadow .3s}
 .withbtn{display:flex;gap:4px}.withbtn input{flex:1}
@@ -129,6 +152,11 @@ input.ok{border-color:var(--s-rec);box-shadow:0 0 0 2px color-mix(in srgb,var(--
   .piece .steps{grid-column:1/-1;grid-row:2}
   .steps button{flex:1}
   .lotbar .fld{width:100%}
+  .combo{width:100%}
+  .filters .fld{width:calc(50% - 5px)}.filters .fld.grow{width:100%;flex:1 1 100%}
+  .fend{margin-left:0;width:100%;justify-content:space-between}
+  .actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.actions #newBtn,.actions #sendBtn{grid-column:1/-1}
+  .npbtns{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -140,15 +168,12 @@ input.ok{border-color:var(--s-rec);box-shadow:0 0 0 2px color-mix(in srgb,var(--
       <div class="sub"><span>ENVIE ANJOU</span><button type="button" class="pill" id="netPill">…</button><button type="button" class="pill" id="mePill">…</button></div>
     </div>
     <div class="actions">
-      <label class="btn primary big" for="cam">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-        Photo de plaque
-      </label>
+      <button id="newBtn" type="button" class="primary big">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Nouveau produit
+      </button>
+      <button id="sendBtn" type="button" class="send">Pièces à envoyer</button>
       <input id="cam" type="file" accept="image/*" capture="environment" hidden>
-      <label class="btn big" for="galerie">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>
-        Importer une photo
-      </label>
       <input id="galerie" type="file" accept="image/*" hidden>
       <button id="journalBtn" type="button">Journal</button>
       <button id="exportBtn" type="button">Exporter Excel</button>
@@ -162,8 +187,19 @@ input.ok{border-color:var(--s-rec);box-shadow:0 0 0 2px color-mix(in srgb,var(--
   </form>
 
   <section class="lotbar" aria-label="Lots">
-    <label class="fld" for="lotNew">Lot en cours<input id="lotNew" list="lotsList" placeholder="ex. Lot 4"><datalist id="lotsList"></datalist></label>
+    <div class="fld combo"><label for="lotNew">Lot en cours</label>
+      <input id="lotNew" role="combobox" aria-expanded="false" aria-controls="lotPop" aria-autocomplete="list" autocomplete="off" placeholder="Rechercher ou créer un lot">
+      <div class="pop" id="lotPop" role="listbox" aria-label="Lots" hidden></div>
+      <datalist id="lotsList"></datalist>
+    </div>
     <div class="chips" id="lotChips" role="group" aria-label="Afficher le lot"></div>
+  </section>
+  <section class="filters" aria-label="Recherche et filtres">
+    <label class="fld grow" for="fQ">Recherche<input id="fQ" type="search" placeholder="Marque, référence, pièce, code-barres…" autocomplete="off"></label>
+    <label class="fld" for="fStatut">Statut<select id="fStatut"><option value="">Tous les statuts</option><option value="photo">Photo prise</option><option value="reference">Pièce référencée</option><option value="envoyee">Commande envoyée</option><option value="recue">Commande reçue</option></select></label>
+    <label class="fld" for="fFam">Famille<select id="fFam"><option value="">Toutes</option></select></label>
+    <label class="fld" for="fMarque">Marque<select id="fMarque"><option value="">Toutes</option></select></label>
+    <div class="fend"><span class="note" id="fCount"></span><button type="button" class="ghost" id="fClear" hidden>Effacer les filtres</button></div>
   </section>
   <section class="stats" id="stats" aria-label="Avancement des pièces"></section>
   <div class="bulk" id="bulk" hidden></div>
@@ -171,14 +207,27 @@ input.ok{border-color:var(--s-rec);box-shadow:0 0 0 2px color-mix(in srgb,var(--
   <p class="note" id="ocrNote"></p>
 </div>
 
+<div class="sheetwrap" id="newModal" hidden role="dialog" aria-modal="true" aria-labelledby="npTitle">
+  <div class="sheet">
+    <div class="jhead"><h2 id="npTitle">Nouveau produit</h2><button type="button" class="ghost" id="npClose" aria-label="Fermer">✕</button></div>
+    <label class="fld" for="npLot">Lot<select id="npLot"></select></label>
+    <label class="fld" for="npLotNew" id="npLotNewWrap" hidden>Nom du nouveau lot<input id="npLotNew" placeholder="ex. Lot 5" autocomplete="off"></label>
+    <div class="npstep"><b>Photo de la plaque signalétique</b><span>Obligatoire : le produit est créé à partir de cette photo.</span></div>
+    <div class="npbtns">
+      <label class="btn primary big" for="cam"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Prendre la photo</label>
+      <label class="btn big" for="galerie"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>Importer une photo</label>
+    </div>
+    <p class="note">Sur PC, tu peux aussi glisser ou coller une photo dans la page.</p>
+  </div>
+</div>
 <div class="modal" id="cropModal" hidden>
   <div class="hint" id="cropHint">Encadre la plaque avec le doigt (ou la souris) pour une meilleure lecture, puis « Lire la plaque ».</div>
   <div class="stage"><canvas id="cropCanvas"></canvas></div>
   <div class="mbar">
     <button type="button" id="rotBtn">↻ Tourner</button>
     <button type="button" id="clrBtn">Toute la photo</button>
-    <button type="button" id="skipBtn">Enregistrer sans lire</button>
-    <button type="button" class="primary" id="readBtn">Lire la plaque</button>
+    <button type="button" id="skipBtn">Créer sans lire</button>
+    <button type="button" class="primary" id="readBtn">Créer et lire la plaque</button>
     <button type="button" class="ghost" id="cancelBtn" style="color:#fff">Annuler</button>
   </div>
 </div>
@@ -332,7 +381,7 @@ function analyserPlaque(txt){
 
 const STATUTS=[{k:"photo",l:"Photo prise",c:"Photo prise"},{k:"reference",l:"Pièce référencée",c:"Référencée"},{k:"envoyee",l:"Commande envoyée",c:"Envoyée"},{k:"recue",l:"Commande reçue",c:"Reçue"}];
 const SLABEL=Object.fromEntries(STATUTS.map(s=>[s.k,s.l]));
-const S={apps:[],lot:"__tous",filtre:null,ready:false,pendingFocus:null,delArm:null,dirty:false,target:{},reading:{}};
+const S={apps:[],lot:"__tous",filtre:null,q:"",fam:"",marque:"",ready:false,pendingFocus:null,delArm:null,dirty:false,target:{},reading:{}};
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2800)}
@@ -446,15 +495,28 @@ $("cropCanvas").addEventListener("pointermove",e=>{if(!C.drag)return;const p=pt(
 $("cropCanvas").addEventListener("pointerup",()=>{C.drag=false;if(C.rect){const r=norm(C.rect);if(r.w<20||r.h<20)C.rect=null}drawCrop()});
 $("rotBtn").onclick=()=>{C.rot=(C.rot+90)%360;C.rect=null;C.view=rotated(C.img,C.rot,1400);drawCrop()};
 $("clrBtn").onclick=()=>{C.rect=null;drawCrop()};
-$("cancelBtn").onclick=()=>{$("cropModal").hidden=true};
+$("cancelBtn").onclick=()=>{$("cropModal").hidden=true;NP.lot=null;toast("Produit non créé : la photo de plaque est obligatoire")};
 $("skipBtn").onclick=()=>enregistrer(false);
 $("readBtn").onclick=()=>enregistrer(true);
-$("cam").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(f)startPhoto(f)});
-$("galerie").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(f)startPhoto(f)});
+/* Nouveau produit : choix du lot puis photo de plaque obligatoire */
+const NP={lot:null};
+function ouvrirNouveau(){if(!ME){askName();toast("Indique d'abord ton prénom");return}
+  const L=lots();if(!L.includes(LOT))L.unshift(LOT);
+  $("npLot").innerHTML=L.map(l=>`<option ${l===LOT?"selected":""}>${esc(l)}</option>`).join("")+'<option value="__new">＋ Nouveau lot…</option>';
+  $("npLotNewWrap").hidden=true;$("npLotNew").value="";$("newModal").hidden=false;$("npLot").focus()}
+$("newBtn").addEventListener("click",ouvrirNouveau);
+$("npClose").addEventListener("click",()=>$("newModal").hidden=true);
+$("newModal").addEventListener("click",e=>{if(e.target.id==="newModal")$("newModal").hidden=true});
+$("npLot").addEventListener("change",()=>{const n=$("npLot").value==="__new";$("npLotNewWrap").hidden=!n;if(n)$("npLotNew").focus()});
+$("newModal").addEventListener("click",e=>{if(e.target.closest('label[for="cam"],label[for="galerie"]')&&$("npLot").value==="__new"&&!$("npLotNew").value.trim()){e.preventDefault();toast("Indique le nom du nouveau lot");$("npLotNew").focus()}});
+async function lotDuFormulaire(){let l=$("npLot").value;if(l==="__new"){l=await creerLot($("npLotNew").value.trim(),false)}return l||LOT}
+async function photoChoisie(f){if(!$("newModal").hidden){NP.lot=await lotDuFormulaire();$("newModal").hidden=true}else NP.lot=LOT;startPhoto(f)}
+$("cam").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(f)photoChoisie(f)});
+$("galerie").addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(f)photoChoisie(f)});
 document.addEventListener("dragover",e=>{if([...e.dataTransfer.types].includes("Files"))e.preventDefault()});
-document.addEventListener("drop",e=>{const f=[...e.dataTransfer.files].find(x=>x.type.startsWith("image/"));if(f){e.preventDefault();startPhoto(f)}});
-document.addEventListener("paste",e=>{if(e.target.matches&&e.target.matches("input"))return;const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith("image/"));if(f)startPhoto(f)});
-async function startPhoto(f){if(!ME){askName();toast("Indique d'abord ton prénom");return}C.file=f;try{openCrop(await loadImg(f))}catch(e){toast("Image illisible, reprends la photo")}}
+document.addEventListener("drop",e=>{const f=[...e.dataTransfer.files].find(x=>x.type.startsWith("image/"));if(f){e.preventDefault();photoChoisie(f)}});
+document.addEventListener("paste",e=>{if(e.target.matches&&e.target.matches("input"))return;const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith("image/"));if(f)photoChoisie(f)});
+async function startPhoto(f){if(!ME){askName();toast("Indique d'abord ton prénom");return}C.file=f;if(!NP.lot)NP.lot=LOT;try{openCrop(await loadImg(f));$("cropHint").textContent=`Nouveau produit · ${NP.lot} — `+$("cropHint").textContent}catch(e){toast("Image illisible, reprends la photo")}}
 
 async function enregistrer(lire){
   $("cropModal").hidden=true;
@@ -462,15 +524,15 @@ async function enregistrer(lire){
   let zone=full;if(C.rect&&lire){const r=norm(C.rect);zone=document.createElement("canvas");
     const src=rotated(C.img,C.rot,2400),k2=src.width/C.view.width;zone.width=r.w*k2;zone.height=r.h*k2;zone.getContext("2d").drawImage(src,r.x*k2,r.y*k2,r.w*k2,r.h*k2,0,0,zone.width,zone.height)}
   else if(lire){zone=rotated(C.img,C.rot,2400)}
-  const id=store.key(),lot=($("lotNew").value.trim()||"Lot 1");ls.set("lotEnCours",lot);
+  const id=store.key(),lot=NP.lot||LOT;NP.lot=null;setLot(lot);S.lot=lot;viderFiltres();S.focusCard=id;
   const doc={lot,famille:"",marque:"",reference:"",codeService:"",serie:"",tw:full.width,th:full.height,
     createdAt:Date.now(),createdBy:ME,analyse:lire?"en_cours":"manuel"};
   THUMBS[id]=thumb.toDataURL("image/jpeg",.7);
   try{await store.set("thumbs/"+id,THUMBS[id]);await store.set("appareils/"+id,doc);await store.set("photos/"+id,full.toDataURL("image/jpeg",.78));
-    journal(lot,{id,...doc},"Photo de plaque ajoutée");
+    journal(lot,{id,...doc},"Produit créé (photo de plaque ajoutée)");
     codeDepuisPhoto(id,C.file);
     if(estArchive(lot))await store.update("lots/"+lotKey(lot),{archive:false})}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
-  if(S.lot!=="__tous"&&S.lot!==lot)S.lot=lot;S.filtre=null;toast("Photo enregistrée");
+  render();toast("✓ Produit créé dans "+lot+" : ajoute maintenant les pièces");
   if(lire)lancerLecture(id,zone);
 }
 async function lancerLecture(id,canvas){
@@ -515,10 +577,27 @@ async function patchPiece(id,pid,data){const a=appById(id);let old={};if(a){cons
 const normPieces=raw=>Object.entries(raw||{}).map(([id,v])=>({...v,id})).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
 
 /* ================= RENDU ================= */
-const tousLots=()=>[...new Set(S.apps.map(a=>a.lot||"Sans lot"))].sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}));
+const tousLots=()=>[...new Set([...S.apps.map(a=>a.lot||"Sans lot"),...Object.values(LOTS).map(x=>x&&x.nom).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}));
 const lots=()=>tousLots().filter(l=>!estArchive(l));
 const lotsArch=()=>tousLots().filter(estArchive);
 const inLot=a=>S.lot==="__tous"?!estArchive(a.lot):(a.lot||"Sans lot")===S.lot;
+/* ---- vue filtrée : lot + recherche + famille + marque + statut ---- */
+const sansAccent=v=>String(v||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const appTxt=a=>sansAccent([a.marque,a.reference,a.codeService,a.serie,a.codeBarre,a.famille,a.createdBy].join(" "));
+function vue(opt={}){const st="statut" in opt?opt.statut:S.filtre;
+  const mots=sansAccent(S.q).split(/\s+/).filter(Boolean),out=[];
+  for(const a of S.apps.filter(inLot)){
+    if(S.fam&&(a.famille||"")!==S.fam)continue;
+    if(S.marque&&(a.marque||"")!==S.marque)continue;
+    let pcs=a.pieces;
+    if(mots.length){const at=appTxt(a),reste=mots.filter(m=>!at.includes(m));
+      if(reste.length){pcs=pcs.filter(p=>{const t=sansAccent(p.nom+" "+p.ref);return reste.every(m=>t.includes(m))});if(!pcs.length)continue}}
+    if(st){pcs=pcs.filter(p=>(p.statut||"photo")===st);if(!pcs.length)continue}
+    out.push({a,pcs})}
+  return out}
+const filtresActifs=()=>!!(S.q||S.fam||S.marque||S.filtre);
+function viderFiltres(){S.q=S.fam=S.marque="";S.filtre=null;$("fQ").value="";$("fStatut").value="";$("fFam").value="";$("fMarque").value=""}
+function optionsSelect(sel,vals,cur,tous){const h=`<option value="">${tous}</option>`+vals.map(v=>`<option ${v===cur?"selected":""}>${esc(v)}</option>`).join("");if(sel.dataset.h!==h){sel.innerHTML=h;sel.dataset.h=h}sel.value=cur}
 let renderT=null;
 function render(){clearTimeout(renderT);renderT=setTimeout(doRender,0)} // différé : le focus a le temps d'atteindre le champ suivant
 function doRender(){
@@ -526,36 +605,45 @@ function doRender(){
   const ae=document.activeElement;if(ae&&ae.closest&&ae.closest("#list")&&ae.matches("input,select")){S.dirty=true;return}
   S.dirty=false;
   const L=lots(),A=lotsArch();$("lotsList").innerHTML=L.map(l=>`<option value="${esc(l)}">`).join("");
+  if(document.activeElement!==$("lotNew"))$("lotNew").value=LOT;
   if(S.lot!=="__tous"&&!L.includes(S.lot)&&!A.includes(S.lot))S.lot="__tous";
   const chip=(k,l,cls="")=>`<button type="button" class="chip ${cls}" data-lot="${esc(k)}" aria-pressed="${S.lot===k}">${esc(l)}</button>`;
   const selArch=S.lot!=="__tous"&&estArchive(S.lot);
   $("lotChips").innerHTML=chip("__tous","Tous les lots en cours")+L.map(l=>chip(l,l)).join("")
     +(A.length?`<button type="button" class="chip arch" id="archToggle" aria-expanded="${!!(S.showArch||selArch)}">Archives (${A.length}) ${S.showArch||selArch?"▴":"▾"}</button>`+(S.showArch||selArch?A.map(l=>chip(l,"🗄 "+l,"archived")).join(""):""):"")
     +(S.lot!=="__tous"?`<button type="button" class="chip act" id="archBtn">${selArch?"Réactiver ce lot":(S.archArm?"Confirmer l'archivage":"Archiver ce lot")}</button>`:"");
-  const apps=S.apps.filter(inLot);const cnt={photo:0,reference:0,envoyee:0,recue:0};
-  apps.forEach(a=>a.pieces.forEach(p=>cnt[p.statut||"photo"]++));const tot=cnt.photo+cnt.reference+cnt.envoyee+cnt.recue;
+  const dansLot=S.apps.filter(inLot);
+  optionsSelect($("fFam"),[...new Set(dansLot.map(a=>a.famille).filter(Boolean))].sort((x,y)=>x.localeCompare(y,"fr")),S.fam,"Toutes");
+  optionsSelect($("fMarque"),[...new Set(dansLot.map(a=>a.marque).filter(Boolean))].sort((x,y)=>x.localeCompare(y,"fr")),S.marque,"Toutes");
+  $("fStatut").value=S.filtre||"";$("fClear").hidden=!filtresActifs();
+  const base=vue({statut:null});const cnt={photo:0,reference:0,envoyee:0,recue:0};
+  base.forEach(({pcs})=>pcs.forEach(p=>cnt[p.statut||"photo"]++));const tot=cnt.photo+cnt.reference+cnt.envoyee+cnt.recue;
+  const nEnv=cnt.reference;const sb=$("sendBtn");sb.disabled=!nEnv;
+  sb.textContent=S.sendArm&&nEnv?`Confirmer : exporter et passer ${nEnv} pièce${nEnv>1?"s":""} en « envoyée »`:`Pièces à envoyer${nEnv?" ("+nEnv+")":""}`;sb.classList.toggle("armed",!!(S.sendArm&&nEnv));
   $("stats").innerHTML=STATUTS.map(s=>`<button type="button" class="stat" data-s="${s.k}" aria-pressed="${S.filtre===s.k}"><span>${s.l}</span><b>${cnt[s.k]}</b><small>${tot?Math.round(cnt[s.k]*100/tot):0} % des pièces</small></button>`).join("");
   const b=$("bulk");
-  if(S.filtre==="reference"&&cnt.reference){b.hidden=false;b.innerHTML=`<button type="button" id="bulkSend" class="primary">Passer les ${cnt.reference} pièces en « Commande envoyée »</button><span>une fois la commande envoyée à Findis</span>`}
+  if(S.filtre==="reference"&&cnt.reference){b.hidden=false;b.innerHTML=`<span>Pour commander ces ${cnt.reference} pièces : bouton « Pièces à envoyer » en haut (export Excel puis passage en « Commande envoyée »).</span>`}
   else if(S.filtre==="envoyee"&&cnt.envoyee){b.hidden=false;b.innerHTML=`<button type="button" id="bulkRecv">Passer les ${cnt.envoyee} pièces en « Commande reçue »</button>`}
   else if(S.lot!=="__tous"&&!estArchive(S.lot)&&tot>0&&cnt.recue===tot){b.hidden=false;b.innerHTML=`<span>Toutes les pièces de ce lot sont reçues.</span><button type="button" id="bulkArch">Archiver ${esc(S.lot)}</button>`}
   else if(selArch){b.hidden=false;b.innerHTML=`<span>🗄 Lot archivé : il n'apparaît plus dans « Tous les lots en cours ».</span>`}
   else{b.hidden=true;b.innerHTML=""}
-  const list=$("list");let shown=S.filtre?apps.filter(a=>a.pieces.some(p=>(p.statut||"photo")===S.filtre)):apps;
-  if(!S.apps.length){list.innerHTML=`<div class="empty"><h2>Aucun appareil</h2><div>Prends en photo la plaque signalétique d'un appareil. Marque, référence et famille sont proposées, tu valides puis tu notes les pièces à commander.<br>Sur PC, tu peux aussi glisser ou coller une photo dans la page.</div><label class="btn primary big" for="cam">Photo de plaque</label><button type="button" id="impBtn" hidden>Importer les lots 2 et 3 existants</button></div>`;
+  const list=$("list");const shown=vue();
+  const nP=shown.reduce((x,v)=>x+v.pcs.length,0);$("fCount").textContent=`${shown.length} produit${shown.length>1?"s":""} · ${nP} pièce${nP>1?"s":""}`;
+  if(!S.apps.length){list.innerHTML=`<div class="empty"><h2>Aucun produit</h2><div>Clique sur « Nouveau produit » et prends en photo la plaque signalétique. Marque, référence et famille sont proposées, tu valides puis tu notes les pièces à commander.</div><button type="button" class="primary big" data-new="1">＋ Nouveau produit</button><button type="button" id="impBtn" hidden>Importer les lots 2 et 3 existants</button></div>`;
     fetch("import-lots-2-3.json",{method:"HEAD"}).then(r=>{const b=$("impBtn");if(r.ok&&b)b.hidden=false}).catch(()=>{});return}
-  if(!shown.length){list.innerHTML=`<div class="empty">Aucun appareil dans cette vue.</div>`;return}
-  list.innerHTML=shown.map(card).join("");
-  loadThumbs(shown.filter(a=>!thumbOf(a)).map(a=>a.id));
+  if(!shown.length){list.innerHTML=filtresActifs()?`<div class="empty">Aucun produit ne correspond à ces filtres.<button type="button" data-clear="1">Effacer les filtres</button></div>`
+      :`<div class="empty"><h2>Lot vide</h2><div>Aucun produit dans ${S.lot==="__tous"?"les lots en cours":esc(S.lot)} pour l'instant.</div><button type="button" class="primary big" data-new="1">＋ Nouveau produit</button></div>`;return}
+  list.innerHTML=shown.map(v=>card(v.a,v.pcs)).join("");
+  loadThumbs(shown.filter(v=>!thumbOf(v.a)).map(v=>v.a.id));
+  if(S.focusCard){const el=list.querySelector(`[data-card="${S.focusCard}"]`);if(el){S.focusCard=null;el.classList.add("fresh");el.scrollIntoView({behavior:"smooth",block:"start"})}}
   if(S.pendingFocus){const el=list.querySelector(`[data-pf="${S.pendingFocus}"]`);S.pendingFocus=null;if(el)el.focus()}
 }
-function card(a){
-  const pcs=a.pieces.filter(p=>!S.filtre||(p.statut||"photo")===S.filtre);
+function card(a,pcs=a.pieces){
   const reading=S.reading[a.id]?`<div class="reading"><span class="spin"></span>Lecture de la plaque…${ocrWorker?"":" (1er chargement du lecteur, quelques secondes)"}</div>`
     :a.analyse==="echec"?`<div class="reading" style="color:var(--danger)">La lecture a échoué, complète les champs à la main.</div>`:"";
   const tgt=S.target[a.id]||"reference";const armed=S.delArm===a.id;
   const fld=(f,label,mono)=>`<label class="fld">${label}<input class="${mono?"mono ":""}${tgt===f?"target":""}" data-f="${f}" data-id="${a.id}" value="${esc(a[f])}"></label>`;
-  return `<article class="card">
+  return `<article class="card" data-card="${a.id}">
   <div class="ph">
     <button type="button" data-act="zoom" data-id="${a.id}" aria-label="Agrandir la photo"><img data-thumb="${a.id}" src="${thumbOf(a)||"data:image/gif;base64,R0lGODlhAQABAAAAACw="}" style="min-height:${thumbOf(a)?0:90}px" alt="Plaque ${esc(a.marque)} ${esc(a.reference)}"></button>
     <div class="meta">${a.serie?"N° série "+esc(a.serie)+"<br>":""}Photo : ${esc(a.createdBy||"?")} · ${new Date(a.createdAt).toLocaleDateString("fr-FR")}${a.ocrConf!=null?`<br>Lisibilité ${a.ocrConf} %`:""}</div>
@@ -569,7 +657,7 @@ function card(a){
     </div>
     ${a.ocrToks&&a.ocrToks.length?`<details class="ocr"><summary>Texte lu sur la plaque : touche un mot pour remplir le champ encadré en vert</summary><div class="toks">${a.ocrToks.map(t=>`<button type="button" class="tok" data-act="tok" data-id="${a.id}" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div></details>`:""}
     <div class="pieces"><div class="ptitle">Pièces à commander · ${a.pieces.length}</div>
-      ${pcs.map(p=>piece(a,p)).join("")||(S.filtre?"":`<div class="note">Aucune pièce notée pour l'instant.</div>`)}
+      ${pcs.map(p=>piece(a,p)).join("")||(filtresActifs()?"":`<div class="note">Aucune pièce notée pour l'instant.</div>`)}${pcs.length<a.pieces.length?`<div class="note">${a.pieces.length-pcs.length} autre${a.pieces.length-pcs.length>1?"s":""} pièce${a.pieces.length-pcs.length>1?"s":""} masquée${a.pieces.length-pcs.length>1?"s":""} par les filtres</div>`:""}
     </div>
     <div class="foot"><span class="footl"><button type="button" class="primary savebtn" data-act="save" data-id="${a.id}" hidden>✓ Enregistrer</button><button type="button" data-act="addp" data-id="${a.id}">+ Ajouter une pièce</button><button type="button" class="ghost" data-act="hist" data-id="${a.id}">Historique</button></span>
       <button type="button" class="ghost danger" data-act="del" data-id="${a.id}">${armed?"Confirmer la suppression":"Supprimer l'appareil"}</button></div>
@@ -577,7 +665,7 @@ function card(a){
 function piece(a,p){const s=p.statut||"photo",armed=S.delArm===p.id;
   return `<div class="piece" data-s="${s}">
     <input data-pf="${p.id}" data-pfield="nom" data-id="${a.id}" data-p="${p.id}" value="${esc(p.nom)}" placeholder="Pièce (ex. module de commande)" aria-label="Désignation de la pièce">
-    <input class="mono" data-pfield="ref" data-id="${a.id}" data-p="${p.id}" value="${esc(p.ref)}" placeholder="Référence Findis" aria-label="Référence de la pièce">
+    <input class="mono" data-pfield="ref" data-id="${a.id}" data-p="${p.id}" value="${esc(p.ref)}" placeholder="Référence Agora" aria-label="Référence Agora de la pièce">
     <div class="steps" role="group" aria-label="Statut">${STATUTS.map(x=>`<button type="button" data-act="st" data-s="${x.k}" data-id="${a.id}" data-p="${p.id}" aria-pressed="${s===x.k}" title="${x.l}">${x.c}</button>`).join("")}</div>
     <button type="button" class="ghost danger" data-act="delp" data-id="${a.id}" data-p="${p.id}" aria-label="Retirer la pièce">${armed?"Retirer ?":"✕"}</button>
     ${p.majBy?`<div class="pwho">${esc(SLABEL[s])} · ${esc(p.majBy)} · ${new Date(p.maj).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})}</div>`:""}
@@ -585,12 +673,51 @@ function piece(a,p){const s=p.statut||"photo",armed=S.delArm===p.id;
 
 /* ================= ÉVÉNEMENTS ================= */
 document.addEventListener("focusout",()=>setTimeout(()=>{if(S.dirty)render()},0));
-$("lotNew").value=ls.get("lotEnCours")||"Lot 1";
-$("lotNew").addEventListener("change",e=>ls.set("lotEnCours",e.target.value.trim()||"Lot 1"));
+/* ---- Lot en cours : rechercher un lot existant ou en créer un ---- */
+let LOT=ls.get("lotEnCours")||"Lot 1";
+function setLot(l){LOT=l;ls.set("lotEnCours",l);$("lotNew").value=l}
+$("lotNew").value=LOT;
+function statsLot(l){const as=S.apps.filter(a=>(a.lot||"Sans lot")===l);return {n:as.length,p:as.reduce((x,a)=>x+a.pieces.length,0)}}
+function renderPop(){const raw=$("lotNew").value.trim(),q=sansAccent(raw),all=tousLots();
+  const m=all.filter(l=>!q||sansAccent(l).includes(q)),exact=all.some(l=>sansAccent(l)===q);
+  let h=m.map((l,i)=>{const st=statsLot(l),ar=estArchive(l);return `<button type="button" role="option" class="opt${l===LOT?" cur":""}" data-pick="${esc(l)}" tabindex="-1"><span>${ar?"🗄 ":""}${esc(l)}${l===LOT?" · en cours":""}</span><small>${st.n} produit${st.n>1?"s":""} · ${st.p} pièce${st.p>1?"s":""}${ar?" · archivé":""}</small></button>`}).join("");
+  if(raw&&!exact){const c=`<button type="button" class="opt create" data-create="1" tabindex="-1">＋ Créer le lot « ${esc(raw)} »</button>`;h=m.length?h+c:c}
+  if(!h)h='<div class="note popnote">Aucun lot pour l\'instant : tape un nom pour le créer.</div>';
+  $("lotPop").innerHTML=h;$("lotPop").hidden=false;$("lotNew").setAttribute("aria-expanded","true")}
+function fermerPop(){$("lotPop").hidden=true;$("lotNew").setAttribute("aria-expanded","false")}
+function choisirLot(l){setLot(l);S.lot=l;S.archArm=false;if(estArchive(l))S.showArch=true;fermerPop();$("lotNew").blur();render();toast("Lot en cours : "+l)}
+async function creerLot(nom,afficher=true){nom=(nom||"").trim();if(!nom)return null;
+  const ex=tousLots().find(l=>sansAccent(l)===sansAccent(nom));if(ex){if(afficher)choisirLot(ex);return ex}
+  try{await store.set("lots/"+lotKey(nom),{nom,archive:false,at:Date.now(),by:ME});LOTS[lotKey(nom)]={nom,archive:false};journal(nom,null,"Lot créé")}catch(e){toast("Enregistrement refusé : vérifie la connexion");return null}
+  if(afficher){choisirLot(nom);toast("✓ Lot « "+nom+" » créé")}return nom}
+$("lotNew").addEventListener("focus",()=>{$("lotNew").select();renderPop()});
+$("lotNew").addEventListener("input",renderPop);
+$("lotNew").addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#lotPop"))return;fermerPop();$("lotNew").value=LOT},150));
+$("lotNew").addEventListener("keydown",e=>{
+  if(e.key==="Escape"){fermerPop();$("lotNew").value=LOT;$("lotNew").blur();return}
+  if(e.key==="ArrowDown"){e.preventDefault();$("lotPop").querySelector(".opt")?.focus();return}
+  if(e.key==="Enter"){e.preventDefault();const raw=$("lotNew").value.trim();if(!raw)return;const q=sansAccent(raw),all=tousLots();
+    const ex=all.find(l=>sansAccent(l)===q),m=all.filter(l=>sansAccent(l).includes(q));
+    if(ex)choisirLot(ex);else if(m.length===1)choisirLot(m[0]);else creerLot(raw)}});
+$("lotPop").addEventListener("mousedown",e=>e.preventDefault());
+$("lotPop").addEventListener("click",e=>{const b=e.target.closest(".opt");if(!b)return;if(b.dataset.create)creerLot($("lotNew").value);else choisirLot(b.dataset.pick)});
+$("lotPop").addEventListener("keydown",e=>{const os=[...$("lotPop").querySelectorAll(".opt")],i=os.indexOf(document.activeElement);
+  if(e.key==="ArrowDown"){e.preventDefault();os[Math.min(i+1,os.length-1)]?.focus()}
+  if(e.key==="ArrowUp"){e.preventDefault();i<=0?$("lotNew").focus():os[i-1].focus()}
+  if(e.key==="Escape"){fermerPop();$("lotNew").value=LOT}});
+document.addEventListener("click",e=>{if(!e.target.closest(".combo"))fermerPop()});
+
+/* ---- Filtres ---- */
+let qT=null;
+$("fQ").addEventListener("input",()=>{clearTimeout(qT);qT=setTimeout(()=>{S.q=$("fQ").value.trim();render()},200)});
+$("fStatut").addEventListener("change",()=>{S.filtre=$("fStatut").value||null;render()});
+$("fFam").addEventListener("change",()=>{S.fam=$("fFam").value;render()});
+$("fMarque").addEventListener("change",()=>{S.marque=$("fMarque").value;render()});
+$("fClear").addEventListener("click",()=>{viderFiltres();render()});
 $("lotChips").addEventListener("click",async e=>{
   if(e.target.id==="archToggle"){S.showArch=!S.showArch;if(!S.showArch&&estArchive(S.lot))S.lot="__tous";render();return}
   if(e.target.id==="archBtn"){await basculerArchive(S.lot);return}
-  const b=e.target.closest("[data-lot]");if(!b)return;S.archArm=false;S.lot=b.dataset.lot;if(S.lot!=="__tous"&&!estArchive(S.lot)){$("lotNew").value=S.lot;ls.set("lotEnCours",S.lot)}render()});
+  const b=e.target.closest("[data-lot]");if(!b)return;S.archArm=false;S.lot=b.dataset.lot;if(S.lot!=="__tous"&&!estArchive(S.lot))setLot(S.lot);render()});
 $("stats").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;S.filtre=S.filtre===b.dataset.s?null:b.dataset.s;render()});
 async function basculerArchive(lot){
   if(estArchive(lot)){try{await store.update("lots/"+lotKey(lot),{archive:false,at:Date.now(),by:ME});journal(lot,null,"Lot réactivé");toast(lot+" réactivé")}catch(e){toast("Enregistrement refusé : vérifie la connexion")}return}
@@ -602,7 +729,7 @@ async function basculerArchive(lot){
 $("bulk").addEventListener("click",async e=>{if(e.target.id==="bulkArch"){S.archArm=true;await basculerArchive(S.lot);return}const to=e.target.id==="bulkSend"?"envoyee":e.target.id==="bulkRecv"?"recue":null;if(!to)return;
   const from=to==="envoyee"?"reference":"envoyee";e.target.disabled=true;const up={};
   const touches=[];
-  S.apps.filter(inLot).forEach(a=>{const ps=a.pieces.filter(p=>p.statut===from);if(ps.length)touches.push([a,ps]);ps.forEach(p=>{up[`appareils/${a.id}/pieces/${p.id}/statut`]=to;up[`appareils/${a.id}/pieces/${p.id}/maj`]=Date.now();up[`appareils/${a.id}/pieces/${p.id}/majBy`]=ME})});
+  vue({statut:from}).forEach(({a,pcs:ps})=>{if(ps.length)touches.push([a,ps]);ps.forEach(p=>{up[`appareils/${a.id}/pieces/${p.id}/statut`]=to;up[`appareils/${a.id}/pieces/${p.id}/maj`]=Date.now();up[`appareils/${a.id}/pieces/${p.id}/majBy`]=ME})});
   touches.forEach(([a,ps])=>journal(a.lot,a,`${ps.map(pLabel).join(", ")} : ${SLABEL[from]} → ${SLABEL[to]} (passage groupé)`));
   try{await store.multi(up)}catch(err){toast("Enregistrement refusé : vérifie la connexion")}
   S.filtre=to;render();toast("Statuts mis à jour")});
@@ -622,6 +749,7 @@ $("list").addEventListener("change",e=>{const t=e.target;if(t.matches("[data-f],
 window.addEventListener("beforeunload",e=>{if(document.querySelector(".dirty")){e.preventDefault();e.returnValue=""}});
 $("list").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.matches("input")){e.preventDefault();e.target.blur()}});
 $("list").addEventListener("mousedown",e=>{if(e.target.closest(".tok"))e.preventDefault()});
+$("list").addEventListener("click",e=>{if(e.target.closest("[data-new]"))ouvrirNouveau();if(e.target.closest("[data-clear]")){viderFiltres();render()}});
 $("list").addEventListener("click",async e=>{const b=e.target.closest("[data-act]");if(!b)return;const id=b.dataset.id,act=b.dataset.act;
   if(act==="zoom"){const a=appById(id);$("zoomImg").src=thumbOf(a);$("zoom").hidden=false;store.get("photos/"+id).then(u=>{if(u)$("zoomImg").src=u}).catch(()=>{});return}
   if(act==="tok"){const f=S.target[id]||"reference";const inp=document.querySelector(`input[data-id="${id}"][data-f="${f}"]`);const t=b.dataset.t;
@@ -701,35 +829,37 @@ $("journalBtn").addEventListener("click",()=>openJournal(null));
 $("jClose").addEventListener("click",()=>$("journal").hidden=true);
 $("journal").addEventListener("click",e=>{if(e.target.id==="journal")$("journal").hidden=true});
 $("jWho").addEventListener("change",renderJ);
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("journal").hidden=true;if(!$("scanModal").hidden)fermerScan()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("journal").hidden=true;$("newModal").hidden=true;if(!$("scanModal").hidden)fermerScan()}});
 
 /* ================= EXPORT EXCEL ================= */
-$("exportBtn").addEventListener("click",async()=>{
-  const btn=$("exportBtn");const apps=S.apps.filter(inLot).slice().sort((a,b)=>a.createdAt-b.createdAt);
-  if(!apps.length){toast("Rien à exporter dans cette vue");return}
-  btn.disabled=true;btn.textContent="Export en cours…";
+/* mode "tout" : la vue affichée (lot + filtres) ; mode "envoi" : seulement les pièces « Pièce référencée » */
+async function exporter(mode){
+  const items=(mode==="envoi"?vue({statut:"reference"}):vue()).slice().sort((x,y)=>x.a.createdAt-y.a.createdAt);
+  if(!items.length){toast(mode==="envoi"?"Aucune pièce référencée à envoyer":"Rien à exporter dans cette vue");return false}
+  const PCS=new Map(items.map(v=>[v.a.id,v.pcs]));const apps=items.map(v=>v.a);const envoi=mode==="envoi";
   try{
     const wb=new ExcelJS.Workbook();const byLot={};apps.forEach(a=>{(byLot[a.lot||"Sans lot"]??=[]).push(a)});
     const thin={style:"thin",color:{argb:"FFBFBFBF"}},med={style:"medium",color:{argb:"FF808080"}};
-    const COLS=[["Appareil",26],["Modèle (plaque)",24],["Photo plaque signalétique",34],["Pièce",24],["Référence pièce",22],["Qté",7],["Statut",20]];
+    const COLS=[["Appareil",26],["Modèle (plaque)",24],["Photo plaque signalétique",34],["Pièce",24],["Référence Agora",22],["Qté",7],["Statut",20]];
     const SCOL={photo:"FF5F6F85",reference:"FFA86A00",envoyee:"FF1D5FA8",recue:"FF1F7A3F"};
     for(const lot of Object.keys(byLot).sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}))){
       const ws=wb.addWorksheet(lot.slice(0,31).replace(/[\\/?*\[\]:]/g,"-"),{views:[{showGridLines:false,state:"frozen",ySplit:3}],pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
       COLS.forEach(([,w],i)=>ws.getColumn(i+1).width=w);
-      ws.mergeCells("A1:G1");const t=ws.getCell("A1");t.value=`Commande pièces Findis — ENVIE ANJOU — ${lot}`;
+      ws.mergeCells("A1:G1");const t=ws.getCell("A1");t.value=envoi?`Pièces à envoyer — ENVIE ANJOU — ${lot} — ${new Date().toLocaleDateString("fr-FR")}`:`Commande pièces Findis — ENVIE ANJOU — ${lot}`;
       t.font={name:"Arial",size:14,bold:true,color:{argb:"FFFFFFFF"}};t.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF2E7D32"}};t.alignment={vertical:"middle",indent:1};ws.getRow(1).height=28;
       const hr=ws.getRow(3);COLS.forEach(([h],i)=>{const c=hr.getCell(i+1);c.value=h;c.font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF455A64"}};c.alignment={horizontal:"center",vertical:"middle",wrapText:true};c.border={top:thin,left:thin,bottom:thin,right:thin}});hr.height=30;
       let r=4,idx=0;
       for(const a of byLot[lot]){
-        const pcs=a.pieces.filter(p=>!S.filtre||(p.statut||"photo")===S.filtre);const rows=pcs.length?pcs:[{nom:"",ref:"",statut:""}];const n=rows.length;
+        const pcs=PCS.get(a.id)||[];const rows=pcs.length?pcs:[{nom:"",ref:"",statut:""}];const n=rows.length;
         const PW=230;let w=PW,h=a.tw?Math.round(a.th*PW/a.tw):150;if(h>220){h=220;w=Math.round(a.tw*h/a.th)}
         const blockPx=Math.max(150,h+16),rowPt=Math.max(24,blockPx*.75/n);
         const fill={type:"pattern",pattern:"solid",fgColor:{argb:idx++%2?"FFFFFFFF":"FFF5F7F6"}};
         const app=[a.famille,a.marque].filter(Boolean).join(" ")||"Appareil";
         const mod=[a.reference,a.codeService&&("service "+a.codeService)].filter(Boolean).join(" — ")+(a.codeBarre?`\nCode-barres : ${a.codeBarre}`:"");
         rows.forEach((p,k)=>{const row=ws.getRow(r+k);row.height=rowPt;
-          [app,mod,"",p.nom,p.ref,pcs.length?1:"",p.statut?SLABEL[p.statut]:""].forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;
-            c.font={name:"Arial",size:10,bold:ci===0||ci===4,color:ci===6&&p.statut?{argb:SCOL[p.statut]}:undefined};
+          const stx=envoi&&p.statut?"envoyee":p.statut;
+          [app,mod,"",p.nom,p.ref,pcs.length?1:"",stx?SLABEL[stx]:""].forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;
+            c.font={name:"Arial",size:10,bold:ci===0||ci===4,color:ci===6&&stx?{argb:SCOL[stx]}:undefined};
             c.fill=fill;c.alignment={vertical:"middle",wrapText:true,horizontal:ci>=5?"center":"left",indent:ci>=5?0:1};
             c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});row.getCell(5).numFmt="@"});
         if(n>1)["A","B","C"].forEach(cl=>ws.mergeCells(`${cl}${r}:${cl}${r+n-1}`));
@@ -749,12 +879,24 @@ $("exportBtn").addEventListener("click",async()=>{
       es.forEach(e=>{const d=new Date(e.t);const r=wj.addRow({d:d.toLocaleDateString("fr-FR"),h:d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),by:e.by,lot:e.lot,lbl:e.lbl,txt:e.txt});r.font={name:"Arial",size:10};r.alignment={vertical:"top",wrapText:true}});
     }catch(e){}
     const buf=await wb.xlsx.writeBuffer();
-    const name=`commande_pieces_findis_${S.lot==="__tous"?"tous_lots":S.lot.replace(/\s+/g,"_")}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const name=`${envoi?"pieces_a_envoyer":"commande_pieces_findis"}_${S.lot==="__tous"?"tous_lots":S.lot.replace(/\s+/g,"_")}_${new Date().toISOString().slice(0,10)}.xlsx`;
     const url=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
     const l=document.createElement("a");l.href=url;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
-  }catch(e){console.error(e);toast("L'export a échoué")}
-  btn.disabled=false;btn.textContent="Exporter Excel";
-});
+    return items;
+  }catch(e){console.error(e);toast("L'export a échoué");return false}
+}
+$("exportBtn").addEventListener("click",async()=>{const btn=$("exportBtn");btn.disabled=true;btn.textContent="Export en cours…";
+  await exporter("tout");btn.disabled=false;btn.textContent="Exporter Excel"});
+/* Pièces à envoyer : export des pièces référencées puis passage en « Commande envoyée » */
+$("sendBtn").addEventListener("click",async()=>{const btn=$("sendBtn");
+  if(!S.sendArm){S.sendArm=true;render();clearTimeout(S.sendT);S.sendT=setTimeout(()=>{S.sendArm=false;render()},5000);return}
+  S.sendArm=false;clearTimeout(S.sendT);btn.disabled=true;btn.textContent="Export en cours…";
+  const items=await exporter("envoi");
+  if(items){const up={},now=Date.now();let n=0;
+    items.forEach(({a,pcs})=>{pcs.forEach(p=>{const k=`appareils/${a.id}/pieces/${p.id}`;up[k+"/statut"]="envoyee";up[k+"/maj"]=now;up[k+"/majBy"]=ME;p.statut="envoyee";n++});
+      journal(a.lot,a,`${pcs.map(pLabel).join(", ")} : Pièce référencée → Commande envoyée (Pièces à envoyer)`)});
+    try{await store.multi(up);toast(`✓ ${n} pièce${n>1?"s":""} exportée${n>1?"s":""} et passée${n>1?"s":""} en « Commande envoyée »`)}catch(e){toast("Export fait, mais statuts non enregistrés : vérifie la connexion")}}
+  render()});
 
 /* ================= DÉMARRAGE ================= */
 if(!store.cloud){$("setup").hidden=false;$("setup").innerHTML="<b>Mode local :</b> les données restent sur cet appareil (DB_URL vide en haut du fichier).";}
