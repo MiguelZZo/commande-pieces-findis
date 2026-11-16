@@ -394,31 +394,42 @@ const store=(()=>{
   const cloud=!!DB_URL;
   if(cloud){
     const U=p=>DB_URL+"/"+ROOT+(p?"/"+p:"")+".json";
-    const req=async(m,p,v)=>{const r=await fetch(U(p),{method:m,headers:{"Content-Type":"application/json"},body:v===undefined?undefined:JSON.stringify(v)});
+    const store_refresh={};
+    const req=async(m,p,v)=>{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),m==="GET"?20000:30000);
+      let r;try{r=await fetch(U(p),{method:m,headers:{"Content-Type":"application/json"},body:v===undefined?undefined:JSON.stringify(v),signal:ctl.signal})}finally{clearTimeout(to)}
       if(!r.ok)throw new Error(r.status===401||r.status===403?"refus":"http "+r.status);return r.json()};
     let onOnline=()=>{};
     // un flux temps réel par nœud écouté (appareils, lots)
-    function listen(path,cb){
-      let tree={};
+    /* Temps réel : UNE seule connexion permanente par onglet (sur "appareils"), fermée quand l'onglet est en arrière-plan.
+       Chrome limite à 6 connexions par serveur : avec plusieurs onglets ouverts, sinon plus rien ne passe (photos bloquées).
+       Les autres nœuds (lots) sont relus régulièrement au lieu d'être écoutés. */
+    function listen(path,cb,opt={}){
+      let tree={},es=null,timer=null;
       const setAt=(p,val)=>{const ks=p.split("/").filter(Boolean);if(!ks.length){tree=val&&typeof val==="object"?val:{};return}
         let o=tree;for(let i=0;i<ks.length-1;i++){if(!o[ks[i]]||typeof o[ks[i]]!=="object")o[ks[i]]={};o=o[ks[i]]}
         if(val===null)delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=val};
       const emit=()=>cb(JSON.parse(JSON.stringify(tree||{})));
+      const relire=()=>req("GET",path).then(v=>{tree=v||{};emit();if(opt.poll)onOnline(true)}).catch(e=>{if(opt.poll)return;emit();toast(e.message==="refus"?"Accès refusé : ouvre le nœud findis dans les règles Firebase":"Base injoignable, vérifie la connexion")});
+      if(opt.poll){relire();setInterval(()=>{if(!document.hidden)relire()},opt.poll);
+        document.addEventListener("visibilitychange",()=>{if(!document.hidden)relire()});store_refresh[path]=relire;return}
       function connect(){
-        let es;try{es=new EventSource(U(path))}catch(e){onOnline(false);return}
+        if(es||document.hidden)return;
+        try{es=new EventSource(U(path))}catch(e){onOnline(false);return}
         es.addEventListener("put",e=>{const m=JSON.parse(e.data);setAt(m.path,m.data);emit()});
         es.addEventListener("patch",e=>{const m=JSON.parse(e.data);for(const [k,v] of Object.entries(m.data||{}))setAt((m.path==="/"?"":m.path)+"/"+k,v);emit()});
         es.addEventListener("cancel",()=>{onOnline(false);toast("Accès refusé à la base : ouvre le nœud findis dans les règles Firebase")});
-        es.addEventListener("auth_revoked",()=>{es.close();connect()});
+        es.addEventListener("auth_revoked",()=>{fermer();connect()});
         es.onopen=()=>onOnline(true);
-        es.onerror=()=>{onOnline(false);if(es.readyState===2)setTimeout(connect,5000)};
+        es.onerror=()=>{onOnline(false);if(es&&es.readyState===2){fermer();clearTimeout(timer);timer=setTimeout(connect,5000)}};
       }
-      connect();
-      req("GET",path).then(v=>{tree=v||{};emit()}).catch(e=>{emit();toast(e.message==="refus"?"Accès refusé : ouvre le nœud findis dans les règles Firebase":"Base injoignable, vérifie la connexion")});
+      function fermer(){if(es){es.close();es=null}}
+      document.addEventListener("visibilitychange",()=>{if(document.hidden)fermer();else connect()});
+      window.addEventListener("pagehide",fermer);
+      connect();if(!es)relire();
     }
     return {cloud,
       key:()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),
-      listen,online:f=>{onOnline=f},
+      listen,online:f=>{onOnline=f},refresh:p=>store_refresh[p]&&store_refresh[p](),
       set:(p,v)=>req("PUT",p,v),
       update:(p,v)=>req("PATCH",p,v),
       remove:p=>req("DELETE",p),
@@ -531,7 +542,7 @@ async function enregistrer(lire){
   try{await store.set("thumbs/"+id,THUMBS[id]);await store.set("appareils/"+id,doc);await store.set("photos/"+id,full.toDataURL("image/jpeg",.78));
     journal(lot,{id,...doc},"Produit créé (photo de plaque ajoutée)");
     codeDepuisPhoto(id,C.file);
-    if(estArchive(lot))await store.update("lots/"+lotKey(lot),{archive:false})}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
+    if(estArchive(lot))await store.update("lots/"+lotKey(lot),{archive:false});store.refresh&&store.refresh("lots")}catch(e){toast("Enregistrement refusé : vérifie la connexion");return}
   render();toast("✓ Produit créé dans "+lot+" : ajoute maintenant les pièces");
   if(lire)lancerLecture(id,zone);
 }
@@ -688,7 +699,7 @@ function fermerPop(){$("lotPop").hidden=true;$("lotNew").setAttribute("aria-expa
 function choisirLot(l){setLot(l);S.lot=l;S.archArm=false;if(estArchive(l))S.showArch=true;fermerPop();$("lotNew").blur();render();toast("Lot en cours : "+l)}
 async function creerLot(nom,afficher=true){nom=(nom||"").trim();if(!nom)return null;
   const ex=tousLots().find(l=>sansAccent(l)===sansAccent(nom));if(ex){if(afficher)choisirLot(ex);return ex}
-  try{await store.set("lots/"+lotKey(nom),{nom,archive:false,at:Date.now(),by:ME});LOTS[lotKey(nom)]={nom,archive:false};journal(nom,null,"Lot créé")}catch(e){toast("Enregistrement refusé : vérifie la connexion");return null}
+  try{await store.set("lots/"+lotKey(nom),{nom,archive:false,at:Date.now(),by:ME});store.refresh&&store.refresh("lots");LOTS[lotKey(nom)]={nom,archive:false};journal(nom,null,"Lot créé")}catch(e){toast("Enregistrement refusé : vérifie la connexion");return null}
   if(afficher){choisirLot(nom);toast("✓ Lot « "+nom+" » créé")}return nom}
 $("lotNew").addEventListener("focus",()=>{$("lotNew").select();renderPop()});
 $("lotNew").addEventListener("input",renderPop);
@@ -720,10 +731,10 @@ $("lotChips").addEventListener("click",async e=>{
   const b=e.target.closest("[data-lot]");if(!b)return;S.archArm=false;S.lot=b.dataset.lot;if(S.lot!=="__tous"&&!estArchive(S.lot))setLot(S.lot);render()});
 $("stats").addEventListener("click",e=>{const b=e.target.closest("[data-s]");if(!b)return;S.filtre=S.filtre===b.dataset.s?null:b.dataset.s;render()});
 async function basculerArchive(lot){
-  if(estArchive(lot)){try{await store.update("lots/"+lotKey(lot),{archive:false,at:Date.now(),by:ME});journal(lot,null,"Lot réactivé");toast(lot+" réactivé")}catch(e){toast("Enregistrement refusé : vérifie la connexion")}return}
+  if(estArchive(lot)){try{await store.update("lots/"+lotKey(lot),{archive:false,at:Date.now(),by:ME});store.refresh&&store.refresh("lots");journal(lot,null,"Lot réactivé");toast(lot+" réactivé")}catch(e){toast("Enregistrement refusé : vérifie la connexion")}return}
   if(!S.archArm){S.archArm=true;render();clearTimeout(S.archT);S.archT=setTimeout(()=>{S.archArm=false;render()},3500);return}
   S.archArm=false;
-  try{await store.set("lots/"+lotKey(lot),{nom:lot,archive:true,at:Date.now(),by:ME});journal(lot,null,"Lot archivé");S.lot="__tous";S.filtre=null;S.showArch=false;render();toast(lot+" archivé : retrouvable dans « Archives »")}
+  try{await store.set("lots/"+lotKey(lot),{nom:lot,archive:true,at:Date.now(),by:ME});store.refresh&&store.refresh("lots");journal(lot,null,"Lot archivé");S.lot="__tous";S.filtre=null;S.showArch=false;render();toast(lot+" archivé : retrouvable dans « Archives »")}
   catch(e){toast("Enregistrement refusé : vérifie la connexion")}
 }
 $("bulk").addEventListener("click",async e=>{if(e.target.id==="bulkArch"){S.archArm=true;await basculerArchive(S.lot);return}const to=e.target.id==="bulkSend"?"envoyee":e.target.id==="bulkRecv"?"recue":null;if(!to)return;
@@ -908,7 +919,7 @@ store.listen("appareils",val=>{S.apps=Object.entries(val).map(([id,d])=>({...d,i
   // anciennes fiches avec vignette intégrée : on la déplace dans "thumbs" pour alléger le chargement
   const up={};S.apps.forEach(a=>{if(a.thumb&&!migres.has(a.id)){migres.add(a.id);up["thumbs/"+a.id]=a.thumb;up["appareils/"+a.id+"/thumb"]=null}});
   if(Object.keys(up).length)store.multi(up).catch(()=>{})});
-store.listen("lots",v=>{LOTS=v||{};render()});
+store.listen("lots",v=>{LOTS=v||{};render()},{poll:30000});
 </script>
 </body>
 </html>
