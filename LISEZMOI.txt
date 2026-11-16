@@ -27,8 +27,9 @@ CONTENU
 
 4. UTILISATION
   - Chaque personne indique son prénom à la première ouverture (affiché sur ses modifications).
-  - « Photo de plaque » ouvre l'appareil photo ; « Importer une photo » prend une image déjà enregistrée
-    (galerie du téléphone ou fichier sur PC). Sur PC, on peut aussi glisser ou coller une image.
+  - « Nouveau produit » : choisis le lot (ou crée-en un), puis la photo de la plaque, obligatoire :
+    « Prendre la photo » (appareil photo) ou « Importer une photo » (galerie du téléphone ou fichier sur PC).
+    Sans photo, le produit n'est pas créé. Sur PC, on peut aussi glisser ou coller une image dans la page.
   - Enregistrement : chaque champ s'enregistre dès que tu le quittes ou appuies sur Entrée.
     Un champ en cours de saisie est surligné en orange et un bouton « ✓ Enregistrer » apparaît sur la fiche ;
     une fois enregistré, le champ s'entoure de vert et un message « ✓ Enregistré » s'affiche.
@@ -37,9 +38,14 @@ CONTENU
   - Encadre la plaque avec le doigt, ↻ pour la remettre droite, puis « Lire la plaque ».
   - Vérifie les champs proposés. Pour corriger : touche le champ (il s'encadre en vert), ouvre
     « Texte lu sur la plaque » et touche le bon mot. Deux mots touchés à la suite s'ajoutent (ex. « G 5611 »).
-  - Pièce : désignation puis référence Findis. Saisir la référence passe la pièce en « Pièce référencée ».
-  - Compteurs en haut = filtres. Filtre « Pièce référencée » → bouton pour tout passer en « Commande envoyée ».
-  - Nouveau lot : tape son nom dans « Lot en cours » ; il apparaît dès la première photo.
+  - Pièce : désignation puis référence Agora. Saisir la référence passe la pièce en « Pièce référencée ».
+  - « Pièces à envoyer » : exporte un Excel (même présentation que l'export) avec uniquement les pièces
+    « Pièce référencée » du lot et des filtres affichés, puis les passe toutes en « Commande envoyée ».
+    Deuxième clic de confirmation obligatoire ; chaque passage est inscrit au journal.
+  - Lot en cours : clique dans le champ, tape quelques lettres pour retrouver un lot existant (lots archivés compris),
+    ou « ＋ Créer le lot … » pour en créer un nouveau (un lot créé existe même vide).
+  - Filtres : recherche texte (marque, référence, code service, n° de série, code-barres, nom ou référence de pièce),
+    statut, famille, marque. Les compteurs et les exports suivent les filtres. « Effacer les filtres » remet tout.
   - Archiver un lot terminé : sélectionne-le puis « Archiver ce lot » (ou le bouton proposé quand toutes les pièces sont reçues).
     Il disparaît de « Tous les lots en cours » mais reste dans « Archives », d'où on peut le réactiver.
   - Traçabilité : chaque action (photo, champ modifié, pièce ajoutée / retirée, référence, statut, archivage)
