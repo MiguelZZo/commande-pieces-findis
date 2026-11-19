@@ -851,7 +851,9 @@ async function exporter(mode){
   try{
     const wb=new ExcelJS.Workbook();const byLot={};apps.forEach(a=>{(byLot[a.lot||"Sans lot"]??=[]).push(a)});
     const thin={style:"thin",color:{argb:"FFBFBFBF"}},med={style:"medium",color:{argb:"FF808080"}};
-    const COLS=[["Appareil",26],["Modèle (plaque)",24],["Photo plaque signalétique",34],["Pièce",24],["Référence Agora",22],["Qté",7],["Statut",20],["Référence appareil",20],["Marque",16],["Famille",18],["Code service",20],["N° de série",20]];
+    // colonnes 1 à 6 = l'appareil (fusionnées sur toutes ses lignes de pièces), puis une ligne par pièce ; statut seulement dans l'export complet
+    const COLS=[["Famille",18],["Marque",16],["Référence appareil",22],["Code service",20],["N° de série",22],["Photo plaque signalétique",34],["Pièce",26],["Référence Agora",22],["Qté",7]].concat(envoi?[]:[["Statut",20]]);
+    const NA=6,CPH=5; // nb de colonnes appareil, index (0) de la colonne photo
     const SCOL={photo:"FF5F6F85",reference:"FFA86A00",envoyee:"FF1D5FA8",recue:"FF1F7A3F"};
     for(const lot of Object.keys(byLot).sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}))){
       const ws=wb.addWorksheet(lot.slice(0,31).replace(/[\\/?*\[\]:]/g,"-"),{views:[{showGridLines:false,state:"frozen",ySplit:3}],pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
@@ -865,25 +867,23 @@ async function exporter(mode){
         const PW=230;let w=PW,h=a.tw?Math.round(a.th*PW/a.tw):150;if(h>220){h=220;w=Math.round(a.tw*h/a.th)}
         const blockPx=Math.max(150,h+16),rowPt=Math.max(24,blockPx*.75/n);
         const fill={type:"pattern",pattern:"solid",fgColor:{argb:idx++%2?"FFFFFFFF":"FFF5F7F6"}};
-        const app=[a.famille,a.marque].filter(Boolean).join(" ")||"Appareil";
-        const mod=[a.reference,a.codeService&&("service "+a.codeService)].filter(Boolean).join(" — ")+(a.codeBarre?`\nCode-barres : ${a.codeBarre}`:"");
         rows.forEach((p,k)=>{const row=ws.getRow(r+k);row.height=rowPt;
-          const stx=envoi&&p.statut?"envoyee":p.statut;
-          [app,mod,"",p.nom,p.ref,pcs.length?1:"",stx?SLABEL[stx]:"",a.reference||"",a.marque||"",a.famille||"",a.codeService||"",a.serie||""].forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;
-            c.font={name:"Arial",size:10,bold:ci===0||ci===4,color:ci===6&&stx?{argb:SCOL[stx]}:undefined};
-            c.fill=fill;c.alignment={vertical:"middle",wrapText:true,horizontal:ci===5||ci===6?"center":"left",indent:ci===5||ci===6?0:1};
-            c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});[5,8,11,12].forEach(i=>row.getCell(i).numFmt="@")});
-        if(n>1)["A","B","C"].forEach(cl=>ws.mergeCells(`${cl}${r}:${cl}${r+n-1}`));
-        ws.getCell(`A${r}`).font={name:"Arial",size:11,bold:true};ws.getCell(`B${r}`).font={name:"Arial",size:9,color:{argb:"FF555555"}};
+          const vals=[a.famille||"",a.marque||"",a.reference||"",a.codeService||"",a.serie||"","",p.nom,p.ref,pcs.length?1:""];
+          if(!envoi)vals.push(p.statut?SLABEL[p.statut]:"");
+          vals.forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;const centre=ci>=8;
+            c.font={name:"Arial",size:10,bold:ci===2||ci===7,color:ci===9&&p.statut?{argb:SCOL[p.statut]}:undefined};
+            c.fill=fill;c.alignment={vertical:"middle",wrapText:true,horizontal:centre?"center":"left",indent:centre?0:1};
+            c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});[3,4,5,8].forEach(i=>row.getCell(i).numFmt="@")});
+        if(n>1)for(let ci=1;ci<=NA;ci++)ws.mergeCells(r,ci,r+n-1,ci);
         let photo=null;try{photo=await store.get("photos/"+a.id)}catch(e){}if(!photo){try{photo=thumbOf(a)||await store.get("thumbs/"+a.id)}catch(e){}}
         if(photo){const im=wb.addImage({base64:photo,extension:"jpeg"});const totPx=rowPt*n/.75,offY=Math.max(6,(totPx-h)/2),rowPx=rowPt/.75;
-          ws.addImage(im,{tl:{col:2+((34*7+5-w)/2)/(34*7+5),row:(r-1)+Math.min(n-.01,offY/rowPx)},ext:{width:w,height:h},editAs:"oneCell"})}
+          ws.addImage(im,{tl:{col:CPH+((34*7+5-w)/2)/(34*7+5),row:(r-1)+Math.min(n-.01,offY/rowPx)},ext:{width:w,height:h},editAs:"oneCell"})}
         r+=n}
       ws.getCell(`A${r+1}`).value="Références appareil lues sur les photos des plaques : à vérifier avant commande.";
       ws.getCell(`A${r+1}`).font={name:"Arial",size:9,italic:true,color:{argb:"FF777777"}};
     }
-    // onglet Journal : qui a fait quoi sur les lots exportés
-    try{const es=(await lireJournal(Object.keys(byLot))).slice().reverse();
+    // onglet Journal : qui a fait quoi sur les lots exportés (pas dans « Pièces à envoyer »)
+    if(!envoi)try{const es=(await lireJournal(Object.keys(byLot))).slice().reverse();
       const wj=wb.addWorksheet("Journal",{views:[{state:"frozen",ySplit:1}]});
       wj.columns=[{header:"Date",key:"d",width:12},{header:"Heure",key:"h",width:8},{header:"Qui",key:"by",width:16},{header:"Lot",key:"lot",width:12},{header:"Appareil",key:"lbl",width:34},{header:"Action",key:"txt",width:70}];
       wj.getRow(1).font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};wj.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF455A64"}};
