@@ -851,12 +851,12 @@ async function exporter(mode){
   try{
     const wb=new ExcelJS.Workbook();const byLot={};apps.forEach(a=>{(byLot[a.lot||"Sans lot"]??=[]).push(a)});
     const thin={style:"thin",color:{argb:"FFBFBFBF"}},med={style:"medium",color:{argb:"FF808080"}};
-    const COLS=[["Appareil",26],["Modèle (plaque)",24],["Photo plaque signalétique",34],["Pièce",24],["Référence Agora",22],["Qté",7],["Statut",20]];
+    const COLS=[["Appareil",26],["Modèle (plaque)",24],["Photo plaque signalétique",34],["Pièce",24],["Référence Agora",22],["Qté",7],["Statut",20],["Référence appareil",20],["Marque",16],["Famille",18],["Code service",20],["N° de série",20]];
     const SCOL={photo:"FF5F6F85",reference:"FFA86A00",envoyee:"FF1D5FA8",recue:"FF1F7A3F"};
     for(const lot of Object.keys(byLot).sort((a,b)=>a.localeCompare(b,"fr",{numeric:true}))){
       const ws=wb.addWorksheet(lot.slice(0,31).replace(/[\\/?*\[\]:]/g,"-"),{views:[{showGridLines:false,state:"frozen",ySplit:3}],pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
       COLS.forEach(([,w],i)=>ws.getColumn(i+1).width=w);
-      ws.mergeCells("A1:G1");const t=ws.getCell("A1");t.value=envoi?`Pièces à envoyer — ENVIE ANJOU — ${lot} — ${new Date().toLocaleDateString("fr-FR")}`:`Commande pièces Findis — ENVIE ANJOU — ${lot}`;
+      ws.mergeCells(1,1,1,COLS.length);const t=ws.getCell("A1");t.value=envoi?`Pièces à envoyer — ENVIE ANJOU — ${lot} — ${new Date().toLocaleDateString("fr-FR")}`:`Commande pièces Findis — ENVIE ANJOU — ${lot}`;
       t.font={name:"Arial",size:14,bold:true,color:{argb:"FFFFFFFF"}};t.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF2E7D32"}};t.alignment={vertical:"middle",indent:1};ws.getRow(1).height=28;
       const hr=ws.getRow(3);COLS.forEach(([h],i)=>{const c=hr.getCell(i+1);c.value=h;c.font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF455A64"}};c.alignment={horizontal:"center",vertical:"middle",wrapText:true};c.border={top:thin,left:thin,bottom:thin,right:thin}});hr.height=30;
       let r=4,idx=0;
@@ -869,10 +869,10 @@ async function exporter(mode){
         const mod=[a.reference,a.codeService&&("service "+a.codeService)].filter(Boolean).join(" — ")+(a.codeBarre?`\nCode-barres : ${a.codeBarre}`:"");
         rows.forEach((p,k)=>{const row=ws.getRow(r+k);row.height=rowPt;
           const stx=envoi&&p.statut?"envoyee":p.statut;
-          [app,mod,"",p.nom,p.ref,pcs.length?1:"",stx?SLABEL[stx]:""].forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;
+          [app,mod,"",p.nom,p.ref,pcs.length?1:"",stx?SLABEL[stx]:"",a.reference||"",a.marque||"",a.famille||"",a.codeService||"",a.serie||""].forEach((v,ci)=>{const c=row.getCell(ci+1);c.value=v;
             c.font={name:"Arial",size:10,bold:ci===0||ci===4,color:ci===6&&stx?{argb:SCOL[stx]}:undefined};
-            c.fill=fill;c.alignment={vertical:"middle",wrapText:true,horizontal:ci>=5?"center":"left",indent:ci>=5?0:1};
-            c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});row.getCell(5).numFmt="@"});
+            c.fill=fill;c.alignment={vertical:"middle",wrapText:true,horizontal:ci===5||ci===6?"center":"left",indent:ci===5||ci===6?0:1};
+            c.border={top:thin,left:thin,right:thin,bottom:k===n-1?med:thin}});[5,8,11,12].forEach(i=>row.getCell(i).numFmt="@")});
         if(n>1)["A","B","C"].forEach(cl=>ws.mergeCells(`${cl}${r}:${cl}${r+n-1}`));
         ws.getCell(`A${r}`).font={name:"Arial",size:11,bold:true};ws.getCell(`B${r}`).font={name:"Arial",size:9,color:{argb:"FF555555"}};
         let photo=null;try{photo=await store.get("photos/"+a.id)}catch(e){}if(!photo){try{photo=thumbOf(a)||await store.get("thumbs/"+a.id)}catch(e){}}
