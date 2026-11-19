@@ -52,6 +52,9 @@ CONTENU
     est enregistrée avec le prénom et l'heure. Bouton « Journal » en haut (lot affiché, filtre par personne)
     et bouton « Historique » sur chaque fiche. L'export Excel contient un onglet « Journal ».
   - « Exporter Excel » : un onglet par lot, photo de la plaque en face des pièces, avec le statut.
+    Colonnes : Famille, Marque, Référence appareil, Code service, N° de série, Photo plaque (une case par appareil,
+    fusionnée sur toutes ses pièces), puis Pièce, Référence Agora, Qté (+ Statut et onglet Journal dans l'export complet ;
+    « Pièces à envoyer » n'a ni statut ni journal).
     L'export suit le lot et le filtre affichés.
 
 À SAVOIR
